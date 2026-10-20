@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -351,6 +352,180 @@ def test_subject_token_from_another_issuer_is_refused(exchange_server):
     assert error.value.status_code == adbc_driver_manager.AdbcStatusCode.UNAUTHENTICATED
     assert warp_code(error=error.value) == "invalid_credentials"
     assert "the sign-in token is not accepted" in str(error.value)
+
+
+# --- attaching to a session ------------------------------------------------------------------
+
+
+def access_token(server, username: str = USERNAME, password: str | None = None) -> str:
+    """An access token from the server's token endpoint (the password grant), as a program
+    that hands it to several processes would get one."""
+    import urllib.request
+
+    request = urllib.request.Request(
+        url=f"{server.base_url}/warp/v1/auth/token",
+        data=json.dumps(
+            obj={
+                "grant_type": "password",
+                "username": username,
+                "password": server.password if password is None else password,
+            }
+        ).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(url=request, timeout=10) as response:
+        return json.loads(s=response.read())["access_token"]
+
+
+def _count(conn, sql: str) -> int:
+    with conn.cursor() as cur:
+        cur.execute(operation=sql)
+        return cur.fetchone()[0]
+
+
+def test_a_transaction_moves_to_another_process(hc_server):
+    token = access_token(server=hc_server)
+    with hardcharger.connect(uri=hc_server.uri, access_token=token) as conn:
+        with conn.cursor() as cur:
+            cur.execute(operation="CREATE OR REPLACE TABLE handoff (i INTEGER)")
+    # Process 1 begins, inserts, and exits leaving the session (and the transaction) open.
+    first = subprocess.run(
+        args=[
+            sys.executable,
+            str(pathlib.Path(__file__).with_name("session_handoff.py")),
+            hc_server.uri,
+            "HANDOFF_TEST_TOKEN",
+        ],
+        env={**os.environ, "HANDOFF_TEST_TOKEN": token},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert first.returncode == 0, first.stderr
+    session_id = first.stdout.strip()
+    with hardcharger.connect(uri=hc_server.uri, access_token=token) as outside:
+        assert _count(conn=outside, sql="SELECT count(*) FROM handoff") == 0
+        # Process 2 (this one) attaches: it sees the uncommitted row, and commits it.
+        with hardcharger.connect(
+            uri=hc_server.uri, access_token=token, session_id=session_id
+        ) as attached:
+            assert attached.session_id == session_id
+            assert attached.adbc_connection.get_option(key="adbc.warp.session.transaction") == (
+                "open"
+            )
+            assert _count(conn=attached, sql="SELECT count(*) FROM handoff") == 1
+            with attached.cursor() as cur:
+                cur.execute(operation="COMMIT")
+        assert _count(conn=outside, sql="SELECT count(*) FROM handoff") == 1
+
+
+def test_attaching_signs_in_as_the_sessions_user_with_a_password_too(hc_server):
+    # The session belongs to the user, not to the token: a password sign-in attaches too.
+    with hardcharger.connect(
+        uri=hc_server.uri,
+        username=USERNAME,
+        password=hc_server.password,
+        close_session_on_release=False,
+    ) as first:
+        session_id = first.session_id
+    with hardcharger.connect(
+        uri=hc_server.uri,
+        username=USERNAME,
+        password=hc_server.password,
+        session_id=session_id,
+        close_session_on_release=True,
+    ) as attached:
+        assert attached.session_id == session_id
+
+
+def _attach_error(server, session_id: str, **credentials) -> adbc_driver_manager.Error:
+    with pytest.raises(expected_exception=adbc_driver_manager.Error) as error:
+        hardcharger.connect(uri=server.uri, session_id=session_id, **credentials)
+    return error.value
+
+
+def test_attaching_to_a_missing_session_is_session_not_found(hc_server):
+    error = _attach_error(
+        server=hc_server,
+        session_id="s_does_not_exist",
+        username=USERNAME,
+        password=hc_server.password,
+    )
+    assert error.status_code == adbc_driver_manager.AdbcStatusCode.NOT_FOUND
+    assert warp_code(error=error) == "session_not_found"
+    assert "attaching to session s_does_not_exist" in str(error)
+
+
+def test_close_session_on_release(hc_server):
+    credentials = {"username": USERNAME, "password": hc_server.password}
+    # A created session ends when its connection closes...
+    with hardcharger.connect(uri=hc_server.uri, **credentials) as conn:
+        created = conn.session_id
+        assert conn.adbc_connection.get_option(key="adbc.warp.session.close_on_release") == ("true")
+    error = _attach_error(server=hc_server, session_id=created, **credentials)
+    assert warp_code(error=error) == "session_not_found"
+    # ... unless told otherwise; an attached one stays when its connection closes...
+    with hardcharger.connect(uri=hc_server.uri, close_session_on_release=False, **credentials) as c:
+        kept = c.session_id
+    for _ in range(2):
+        with hardcharger.connect(uri=hc_server.uri, session_id=kept, **credentials) as attached:
+            assert attached.adbc_connection.get_option(
+                key="adbc.warp.session.close_on_release"
+            ) == ("false")
+            assert attached.session_id == kept
+    # ... until a connection that may end it closes.
+    with hardcharger.connect(uri=hc_server.uri, session_id=kept, **credentials) as attached:
+        attached.adbc_connection.set_options(**{"adbc.warp.session.close_on_release": "true"})
+    error = _attach_error(server=hc_server, session_id=kept, **credentials)
+    assert warp_code(error=error) == "session_not_found"
+
+
+@pytest.fixture(scope="module")
+def rbac_server(tmp_path_factory):
+    """A server under access control (a DuckDB-file store) with a second user, bob."""
+    workdir = tmp_path_factory.mktemp("rbac")
+    server = start_server(
+        workdir=workdir,
+        extra_args=["--rbac-store-uri", f"duckdb:{(workdir / 'rbac.duckdb').as_posix()}"],
+    )
+    server.bob_password = "bob-" + server.password
+    try:
+        with hardcharger.connect(
+            uri=server.uri, username=USERNAME, password=server.password
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(operation=f"CREATE USER bob WITH PASSWORD '{server.bob_password}'")
+    except Exception:
+        stop_server(server=server)
+        raise
+    yield server
+    stop_server(server=server)
+
+
+def test_another_users_session_is_refused(rbac_server):
+    with hardcharger.connect(
+        uri=rbac_server.uri,
+        username=USERNAME,
+        password=rbac_server.password,
+        close_session_on_release=False,
+    ) as admin:
+        admins = admin.session_id
+    error = _attach_error(
+        server=rbac_server, session_id=admins, username="bob", password=rbac_server.bob_password
+    )
+    # The server answers another user's session as it answers a missing one (§9.2).
+    assert error.status_code == adbc_driver_manager.AdbcStatusCode.NOT_FOUND
+    assert warp_code(error=error) == "session_not_found"
+    # The twin: the session's own user attaches.
+    with hardcharger.connect(
+        uri=rbac_server.uri,
+        username=USERNAME,
+        password=rbac_server.password,
+        session_id=admins,
+        close_session_on_release=True,
+    ) as attached:
+        assert attached.session_id == admins
 
 
 # --- client certificate sign-in (mutual TLS) -----------------------------------------------

@@ -51,6 +51,12 @@ class DatabaseOptions(enum.Enum):
     RETRY_MAX_ATTEMPTS = "adbc.warp.retry.max_attempts"
     #: Replace a session the server lost with a new one ("true", the default).
     SESSION_RECONNECT = "adbc.warp.session.reconnect"
+    #: Attach every connection to this existing session instead of creating one (it must be
+    #: the signed-in user's): its open transaction, temporary tables and settings carry on.
+    SESSION_ID = "adbc.warp.session.id"
+    #: "true"/"false": whether closing a connection ends its session on the server. Default:
+    #: "true" for a session the connection created, "false" for one it attached to.
+    SESSION_CLOSE_ON_RELEASE = "adbc.warp.session.close_on_release"
 
 
 class ConnectionOptions(enum.Enum):
@@ -67,8 +73,12 @@ class ConnectionOptions(enum.Enum):
     #: The most connections one bulk ingest is sent over at once (``adbc.warp.ingest.parts``).
     INGEST_PARTS = "adbc.hardcharger.ingest.parts"
 
-    #: The connection's current server session id.
+    #: The connection's current server session id (read-only; to attach to a session, use
+    #: the database option).
     SESSION_ID = "adbc.warp.session.id"
+    #: "true"/"false": whether closing this connection ends its session on the server (read
+    #: and write).
+    SESSION_CLOSE_ON_RELEASE = "adbc.warp.session.close_on_release"
     #: How often the connection's session was lost and replaced.
     SESSION_REPLACEMENTS = "adbc.warp.session.replacements"
     #: The session's transaction as the server reports it (read-only): "none", "open",

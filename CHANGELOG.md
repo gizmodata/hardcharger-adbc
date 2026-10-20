@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Attaching to an existing session, through warp-sql-adbc `2c0af4e`: `connect(session_id=...)`
+  (option `adbc.warp.session.id`) uses that session instead of creating one, its open
+  transaction included; `Connection.session_id` reads a connection's.
+  `connect(close_session_on_release=...)` (option `adbc.warp.session.close_on_release`, also a
+  connection option) says whether closing ends the session: by default yes for a session the
+  connection created, no for an attached one. A session the server doesn't have, or another
+  user's, is `NotFound` with `warp.code` `session_not_found`. With several replicas it works
+  only when routing reaches the replica that holds the session (the README says more).
 - `connect(subject_token=...)`: sign in with your identity provider's token (an OIDC ID token
   or another JWT the server trusts), exchanged for a Hardcharger access token (Warp SQL's
   `token_exchange` grant, option `adbc.warp.auth.subject_token`). It is refused beside

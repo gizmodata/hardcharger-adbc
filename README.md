@@ -326,6 +326,48 @@ address as one) and the certificate must list that IP address. It is what GizmoS
 parts) sends the same name; `tls_skip_verify=True` still sends it, without checking the
 certificate. Python refuses a different value for the same option in `db_kwargs`.
 
+## 🔁 Attaching to an existing session
+
+A session (its open transaction, temporary tables and settings) can outlive its connection
+and be picked up by another process: a job runner that begins a transaction in one step and
+commits it in the next, or a worker that restarts. The first connection keeps its session
+when it closes (`close_session_on_release=False`) and passes on `conn.session_id`; the second
+attaches with `session_id=` and the same user's credentials, typically the same access token
+(the session belongs to the user who created it):
+
+```python
+# Process 1: begin a transaction, then hand the session on.
+with hardcharger.connect(uri="hardcharger://db.example.com", access_token=token,
+                         close_session_on_release=False) as conn:
+    with conn.cursor() as cur:
+        cur.execute(operation="BEGIN TRANSACTION")
+        cur.execute(operation="INSERT INTO orders VALUES (1, 'pending')")
+    session_id = conn.session_id  # pass it on, with the token
+
+# Process 2: attach, see the uncommitted row, commit.
+with hardcharger.connect(uri="hardcharger://db.example.com", access_token=token,
+                         session_id=session_id) as conn:
+    with conn.cursor() as cur:
+        cur.execute(operation="SELECT count(*) FROM orders")
+        print(cur.fetchone())  # (1,)
+        cur.execute(operation="COMMIT")
+```
+
+They are the Warp SQL driver's database options `adbc.warp.session.id` and
+`adbc.warp.session.close_on_release` (a connection option too, settable any time), in every
+language. Opening checks the session (`GET /warp/v1/sessions/{id}`) and creates none: an id the
+server doesn't have, or another user's session, fails with `NotFound` and `warp.code`
+`session_not_found` (the server answers both the same way). Closing an attached connection
+leaves the session (`close_session_on_release` defaults to `False` for it, `True` for a
+session the connection created); it ends when a connection with `True` closes or when it idles
+out (`--session-idle-timeout`). An attached session the server loses is not replaced.
+
+**Several replicas:** a session lives on the one Hardcharger replica that created it.
+Attaching from another client works only if its requests are routed to that replica. Affinity
+by client IP address won't do it when the second client's address differs from the first's
+(another host, NAT or CI runner): the attach then fails with `session_not_found`. Route on
+something both clients send, or connect both to that replica's own address.
+
 ## 🧩 Driver manifest
 
 `driver = "hardcharger"` works in any ADBC driver manager once `hardcharger.toml` is in one of

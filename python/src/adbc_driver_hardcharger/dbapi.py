@@ -226,6 +226,12 @@ class Connection(_BaseConnection):
         """The signed-in user (``HARDCHARGER_USER()``)."""
         return self._scalar(sql="SELECT HARDCHARGER_USER()")
 
+    @property
+    def session_id(self) -> str:
+        """This connection's server session id (``adbc.warp.session.id``), for another
+        process to attach to with ``connect(session_id=...)``."""
+        return self.adbc_connection.get_option(key=ConnectionOptions.SESSION_ID.value)
+
     def current_session(self) -> str:
         """This connection's server session id (``HARDCHARGER_CURRENT_SESSION()``)."""
         return self._scalar(sql="SELECT CAST(HARDCHARGER_CURRENT_SESSION() AS VARCHAR)")
@@ -255,6 +261,8 @@ def connect(
     tls_client_cert: Optional[PemSource] = None,
     tls_client_key: Optional[PemSource] = None,
     tls_server_name: Optional[str] = None,
+    session_id: Optional[str] = None,
+    close_session_on_release: Optional[bool] = None,
     catalog: Optional[str] = None,
     db_schema: Optional[str] = None,
     db_kwargs: Optional[dict[str, str]] = None,
@@ -308,6 +316,18 @@ def connect(
         tls_server_name: The server's host name for TLS, when it isn't the URI's (connecting
             by IP address, or through a tunnel or load balancer): the driver sends it as the
             TLS server name (SNI) and checks the server's certificate against it.
+        session_id: Attach to this existing session (``Connection.session_id`` of another
+            connection, of this or another process) instead of creating one: its open
+            transaction, temporary tables and settings carry on here. Sign in as the
+            session's user (typically with the same ``access_token``); a session the server
+            doesn't have, or another user's, is refused with ``session_not_found``. The
+            session lives on the server instance that created it: behind a load balancer,
+            this works only when routing reaches that instance.
+        close_session_on_release: Whether closing the connection ends its session on the
+            server. Default: ``True`` for a session the connection created, ``False`` for
+            one it attached to (``session_id``), which then stays until a connection closes it
+            with ``True`` or it idles out. ``False`` on the first connection hands its
+            session, open transaction included, to the next.
         catalog: Catalog to make current for the session.
         db_schema: Schema to make current for the session.
         db_kwargs: Extra ADBC database options (``adbc.hardcharger.*``, ``adbc.warp.*``).
@@ -340,6 +360,13 @@ def connect(
             )
     if tls_server_name is not None and not tls_server_name:
         raise ValueError("tls_server_name can't be empty")
+    if session_id is not None and not session_id:
+        raise ValueError("session_id can't be empty")
+    if close_session_on_release is not None and not isinstance(close_session_on_release, bool):
+        raise TypeError(
+            "close_session_on_release must be a bool, not "
+            f"{type(close_session_on_release).__name__}"
+        )
     if not isinstance(share_sign_in, (bool, str)):
         raise TypeError(
             f"share_sign_in must be a bool or a str, not {type(share_sign_in).__name__}"
@@ -413,6 +440,14 @@ def connect(
         if value is not None:
             put(key=key, value=_pem(value=value))
     put_only(key=options.TLS_SERVER_NAME.value, value=tls_server_name, name="tls_server_name")
+    put_only(key=options.SESSION_ID.value, value=session_id, name="session_id")
+    put_only(
+        key=options.SESSION_CLOSE_ON_RELEASE.value,
+        value=None
+        if close_session_on_release is None
+        else _setting_text(value=close_session_on_release),
+        name="close_session_on_release",
+    )
 
     standard = adbc_driver_manager.ConnectionOptions
     if catalog is not None:

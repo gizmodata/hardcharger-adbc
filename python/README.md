@@ -26,6 +26,8 @@ with hardcharger.connect(uri="hardcharger://localhost?tls=false", username="hard
 [repository README](https://github.com/gizmodata/hardcharger-adbc#readme) for tags, settings,
 browser sign-in, client certificate sign-in (`auth_type="client_certificate"`), token exchange
 with your identity provider's tokens (`subject_token=`), the TLS server name
-(`tls_server_name=`), the driver manifest, and the C/C++ and Go examples.
+(`tls_server_name=`), attaching to an existing session (`session_id=`; with several replicas
+it works only when routing reaches the replica that holds the session), the driver manifest,
+and the C/C++ and Go examples.
 
 Apache License 2.0. Built by [GizmoData](https://gizmodata.com).

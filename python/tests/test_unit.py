@@ -212,6 +212,49 @@ class TestConnectOptions:
             "adbc.warp.tls.server_name": "hc-1.gizmodata.test",
         }
 
+    def test_session_id_and_close_session_on_release(self, mock_db, mock_conn, mock_cls):
+        hardcharger.connect(
+            uri="hardcharger://h",
+            access_token="tok",
+            session_id="s_1",
+            close_session_on_release=True,
+        )
+        assert _db_kwargs(mock_db=mock_db) == {
+            "uri": "hardcharger://h",
+            "adbc.warp.auth.access_token": "tok",
+            "adbc.warp.session.id": "s_1",
+            "adbc.warp.session.close_on_release": "true",
+        }
+        hardcharger.connect(uri="hardcharger://h", close_session_on_release=False)
+        assert _db_kwargs(mock_db=mock_db)["adbc.warp.session.close_on_release"] == "false"
+        hardcharger.connect(uri="hardcharger://h")
+        assert "adbc.warp.session.close_on_release" not in _db_kwargs(mock_db=mock_db)
+
+    @pytest.mark.parametrize(
+        argnames=("kwargs", "error", "text"),
+        argvalues=[
+            ({"session_id": ""}, ValueError, "session_id can't be empty"),
+            ({"close_session_on_release": "false"}, TypeError, "must be a bool, not str"),
+            (
+                {"session_id": "s_1", "db_kwargs": {"adbc.warp.session.id": "s_2"}},
+                ValueError,
+                "session_id= and db_kwargs",
+            ),
+            (
+                {
+                    "close_session_on_release": True,
+                    "db_kwargs": {"adbc.warp.session.close_on_release": "false"},
+                },
+                ValueError,
+                "disagree",
+            ),
+        ],
+    )
+    def test_session_arguments_are_checked(self, mock_db, mock_conn, mock_cls, kwargs, error, text):
+        with pytest.raises(expected_exception=error, match=text):
+            hardcharger.connect(uri="hardcharger://h", **kwargs)
+        mock_db.assert_not_called()
+
     def test_tls_server_name_conflicts(self, mock_db, mock_conn, mock_cls):
         with pytest.raises(expected_exception=ValueError, match="disagree: give one of them"):
             hardcharger.connect(
@@ -318,6 +361,15 @@ class TestLibrary:
             **{"adbc.warp.tls.server_name": "hc-1.gizmodata.test"},
         ) as db:
             assert db.get_option(key="adbc.warp.tls.server_name") == "hc-1.gizmodata.test"
+
+    def test_session_options_reach_the_warp_sql_driver(self):
+        with adbc_driver_manager.AdbcDatabase(
+            driver=_driver_path(),
+            uri="hardcharger://127.0.0.1",
+            **{"adbc.warp.session.id": "s_1", "adbc.warp.session.close_on_release": "false"},
+        ) as db:
+            assert db.get_option(key="adbc.warp.session.id") == "s_1"
+            assert db.get_option(key="adbc.warp.session.close_on_release") == "false"
 
     def test_plus_http_is_refused(self):
         with pytest.raises(expected_exception=adbc_driver_manager.Error) as error:
