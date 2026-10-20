@@ -44,7 +44,10 @@ class DatabaseOptions(enum.Enum):
     #: Host name the server certificate is checked against, instead of the URI's.
     TLS_SERVER_NAME = "adbc.warp.tls.server_name"
     #: A Warp SQL access token obtained elsewhere (used as is, never renewed by the driver).
+    #: Readable too: the token in use (a bearer secret; see ``Connection.access_token``).
     ACCESS_TOKEN = "adbc.warp.auth.access_token"
+    #: Read-only: when the token in use expires, RFC 3339 UTC ("" when unknown).
+    ACCESS_TOKEN_EXPIRES_AT = "adbc.warp.auth.access_token_expires_at"
     #: An identity provider's token, exchanged for an access token.
     SUBJECT_TOKEN = "adbc.warp.auth.subject_token"
     #: How often a request that is safe to repeat is sent, first try included.
@@ -79,6 +82,11 @@ class ConnectionOptions(enum.Enum):
     #: "true"/"false": whether closing this connection ends its session on the server (read
     #: and write).
     SESSION_CLOSE_ON_RELEASE = "adbc.warp.session.close_on_release"
+    #: The access token the connection sends (read-only here): renewed first when due, so it
+    #: is the current one. A bearer secret: store it encrypted, never log it.
+    ACCESS_TOKEN = "adbc.warp.auth.access_token"
+    #: When that token expires, RFC 3339 UTC ("" when unknown; read-only).
+    ACCESS_TOKEN_EXPIRES_AT = "adbc.warp.auth.access_token_expires_at"
     #: How often the connection's session was lost and replaced.
     SESSION_REPLACEMENTS = "adbc.warp.session.replacements"
     #: The session's transaction as the server reports it (read-only): "none", "open",

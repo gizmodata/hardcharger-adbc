@@ -268,6 +268,36 @@ class TestConnectOptions:
         mock_db.assert_not_called()
 
 
+class _FakeAdbcConnection:
+    def __init__(self, options: dict):
+        self.options = options
+
+    def get_option(self, key):
+        return self.options[key]
+
+
+class _FakeConnection:
+    def __init__(self, options: dict):
+        self.adbc_connection = _FakeAdbcConnection(options=options)
+
+
+def test_access_token_properties():
+    import datetime
+
+    conn = _FakeConnection(
+        options={
+            "adbc.warp.auth.access_token": "eyJ.tok",
+            "adbc.warp.auth.access_token_expires_at": "2026-10-20T15:14:13Z",
+        }
+    )
+    assert hardcharger.Connection.access_token.fget(conn) == "eyJ.tok"
+    assert hardcharger.Connection.access_token_expires_at.fget(conn) == datetime.datetime(
+        year=2026, month=10, day=20, hour=15, minute=14, second=13, tzinfo=datetime.timezone.utc
+    )
+    conn.adbc_connection.options["adbc.warp.auth.access_token_expires_at"] = ""
+    assert hardcharger.Connection.access_token_expires_at.fget(conn) is None
+
+
 def test_value_helpers():
     assert hardcharger._tag_text(tag={"b": 2, "a": "x"}) == '{"a":"x","b":2}'
     assert hardcharger._tag_text(tag=None) == ""

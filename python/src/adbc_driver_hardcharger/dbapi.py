@@ -18,6 +18,7 @@ language gets the same behaviour; this module only maps keyword arguments to its
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 from collections.abc import Mapping
@@ -231,6 +232,27 @@ class Connection(_BaseConnection):
         """This connection's server session id (``adbc.warp.session.id``), for another
         process to attach to with ``connect(session_id=...)``."""
         return self.adbc_connection.get_option(key=ConnectionOptions.SESSION_ID.value)
+
+    @property
+    def access_token(self) -> str:
+        """The access token this connection sends (``adbc.warp.auth.access_token``): the one
+        the driver got by signing in, renewed first when it is about to expire (so after a
+        renewal, the new one), or the ``access_token`` given to ``connect()`` as it is.
+
+        It is a bearer secret: anyone holding it acts as this user until it expires. Keep it
+        in memory or store it encrypted, and never log it. Hand it, with ``session_id``, to
+        another process that attaches to this connection's session.
+        """
+        return self.adbc_connection.get_option(key=ConnectionOptions.ACCESS_TOKEN.value)
+
+    @property
+    def access_token_expires_at(self) -> Optional[datetime.datetime]:
+        """When :attr:`access_token` expires (a UTC datetime), or ``None`` when the driver
+        doesn't know (``adbc.warp.auth.access_token_expires_at``)."""
+        text = self.adbc_connection.get_option(key=ConnectionOptions.ACCESS_TOKEN_EXPIRES_AT.value)
+        if not text:
+            return None
+        return datetime.datetime.fromisoformat(text)
 
     def current_session(self) -> str:
         """This connection's server session id (``HARDCHARGER_CURRENT_SESSION()``)."""

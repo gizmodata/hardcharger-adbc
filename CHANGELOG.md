@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `Connection.access_token` and `Connection.access_token_expires_at` (a UTC datetime, or
+  `None`), through warp-sql-adbc `4596835`: the token the connection sends, renewed first when
+  due, or the caller's own `access_token` as given (options `adbc.warp.auth.access_token` and
+  `adbc.warp.auth.access_token_expires_at`, readable on the database and connection in every
+  language). It is a bearer secret; with `session_id` it hands a session to another process.
 - Attaching to an existing session, through warp-sql-adbc `2c0af4e`: `connect(session_id=...)`
   (option `adbc.warp.session.id`) uses that session instead of creating one, its open
   transaction included; `Connection.session_id` reads a connection's.

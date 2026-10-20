@@ -481,6 +481,106 @@ def test_close_session_on_release(hc_server):
     assert warp_code(error=error) == "session_not_found"
 
 
+def _bearer_status(server, token: str, session_id: str) -> int:
+    """The HTTP status of reading the session with ``token`` as a raw bearer token."""
+    import urllib.error
+    import urllib.request
+
+    request = urllib.request.Request(
+        url=f"{server.base_url}/warp/v1/sessions/{session_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(url=request, timeout=10) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+@pytest.fixture(scope="module")
+def lifetime_server(tmp_path_factory):
+    server = start_server(
+        workdir=tmp_path_factory.mktemp("lifetime"),
+        extra_args=["--token-lifetime-seconds", "600"],
+    )
+    yield server
+    stop_server(server=server)
+
+
+def test_the_access_token_is_readable_and_works(lifetime_server):
+    import datetime
+
+    with hardcharger.connect(
+        uri=lifetime_server.uri, username=USERNAME, password=lifetime_server.password
+    ) as conn:
+        token = conn.access_token
+        assert token
+        assert _bearer_status(server=lifetime_server, token=token, session_id=conn.session_id) == (
+            200
+        )
+        # The twin: a token the server didn't issue is refused.
+        assert (
+            _bearer_status(server=lifetime_server, token=token + "x", session_id=conn.session_id)
+            == 401
+        )
+        expires_at = conn.access_token_expires_at
+        assert expires_at.tzinfo is not None and expires_at.utcoffset() == datetime.timedelta(
+            seconds=0
+        )
+        left = expires_at - datetime.datetime.now(tz=datetime.timezone.utc)
+        assert datetime.timedelta(seconds=590) < left <= datetime.timedelta(seconds=601), left
+        text = conn.adbc_connection.get_option(key="adbc.warp.auth.access_token_expires_at")
+        assert text.endswith("Z") and datetime.datetime.fromisoformat(text) == expires_at
+
+
+def test_the_access_token_after_a_renewal(tmp_path):
+    server = start_server(workdir=tmp_path, extra_args=["--token-lifetime-seconds", "2"])
+    try:
+        with hardcharger.connect(
+            uri=server.uri, username=USERNAME, password=server.password
+        ) as conn:
+            first = conn.access_token
+            time.sleep(2.5)
+            second = conn.access_token
+            assert second and second != first
+            assert _bearer_status(server=server, token=second, session_id=conn.session_id) == 200
+            assert conn.current_user() == USERNAME
+    finally:
+        stop_server(server=server)
+
+
+def test_a_callers_own_access_token_reads_back_as_given(lifetime_server):
+    token = access_token(server=lifetime_server)
+    with hardcharger.connect(uri=lifetime_server.uri, access_token=token) as conn:
+        assert conn.access_token == token
+        # Hardcharger's tokens are JWTs: the expiry comes from their exp claim.
+        assert conn.access_token_expires_at is not None
+
+
+def test_a_session_and_its_token_go_to_the_next_connection(hc_server):
+    with hardcharger.connect(
+        uri=hc_server.uri, username=USERNAME, password=hc_server.password
+    ) as c:
+        with c.cursor() as cur:
+            cur.execute(operation="CREATE OR REPLACE TABLE token_handoff (i INTEGER)")
+    with hardcharger.connect(
+        uri=hc_server.uri,
+        username=USERNAME,
+        password=hc_server.password,
+        close_session_on_release=False,
+    ) as first:
+        with first.cursor() as cur:
+            cur.execute(operation="BEGIN TRANSACTION")
+            cur.execute(operation="INSERT INTO token_handoff VALUES (1)")
+        session_id, token = first.session_id, first.access_token
+    with hardcharger.connect(
+        uri=hc_server.uri, access_token=token, session_id=session_id
+    ) as attached:
+        assert _count(conn=attached, sql="SELECT count(*) FROM token_handoff") == 1
+        with attached.cursor() as cur:
+            cur.execute(operation="COMMIT")
+
+
 @pytest.fixture(scope="module")
 def rbac_server(tmp_path_factory):
     """A server under access control (a DuckDB-file store) with a second user, bob."""

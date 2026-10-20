@@ -331,18 +331,18 @@ certificate. Python refuses a different value for the same option in `db_kwargs`
 A session (its open transaction, temporary tables and settings) can outlive its connection
 and be picked up by another process: a job runner that begins a transaction in one step and
 commits it in the next, or a worker that restarts. The first connection keeps its session
-when it closes (`close_session_on_release=False`) and passes on `conn.session_id`; the second
-attaches with `session_id=` and the same user's credentials, typically the same access token
-(the session belongs to the user who created it):
+when it closes (`close_session_on_release=False`) and passes on `conn.session_id` with its
+`conn.access_token` (see [below](#-reading-the-access-token)); the second attaches with
+`session_id=` and that token, since the session belongs to the user who created it:
 
 ```python
 # Process 1: begin a transaction, then hand the session on.
-with hardcharger.connect(uri="hardcharger://db.example.com", access_token=token,
+with hardcharger.connect(uri="hardcharger://db.example.com", username="hardcharger", password="change-me",
                          close_session_on_release=False) as conn:
     with conn.cursor() as cur:
         cur.execute(operation="BEGIN TRANSACTION")
         cur.execute(operation="INSERT INTO orders VALUES (1, 'pending')")
-    session_id = conn.session_id  # pass it on, with the token
+    session_id, token = conn.session_id, conn.access_token  # pass both on; the token is a secret
 
 # Process 2: attach, see the uncommitted row, commit.
 with hardcharger.connect(uri="hardcharger://db.example.com", access_token=token,
@@ -367,6 +367,33 @@ Attaching from another client works only if its requests are routed to that repl
 by client IP address won't do it when the second client's address differs from the first's
 (another host, NAT or CI runner): the attach then fails with `session_not_found`. Route on
 something both clients send, or connect both to that replica's own address.
+
+## 🔑 Reading the access token
+
+A connection's access token is readable: the token the driver got when it signed in (password,
+`subject_token`, browser), renewed first when it is about to expire, so after a renewal you get
+the new one; or the `access_token` you gave `connect()`, as it is.
+
+```python
+with hardcharger.connect(uri="hardcharger://db.example.com", username="hardcharger", password="change-me") as conn:
+    token = conn.access_token              # a bearer secret: never log it
+    print(conn.access_token_expires_at)    # e.g. 2026-10-20 16:14:13+00:00 (None when unknown)
+    print(conn.adbc_connection.get_option(key="adbc.warp.auth.access_token_expires_at"))
+    # '2026-10-20T16:14:13Z'
+```
+
+They are the Warp SQL driver's `adbc.warp.auth.access_token` and
+`adbc.warp.auth.access_token_expires_at` (read-only; RFC 3339 UTC, from the token response's
+`expires_in` or the token's own `exp`, `""` when unknown), readable on the database and the
+connection in every language. The token works as `Authorization: Bearer <token>` on the
+server's HTTP API, and with `session_id` it lets another process carry on in this connection's
+session ([above](#-attaching-to-an-existing-session)).
+
+**It is a bearer secret:** whoever holds it acts as the user until it expires (the server's
+`--token-lifetime-seconds`). Keep it in memory or store it encrypted, send it only over TLS,
+and never log it, print it or put it in a URL. A token handed to another process can't be
+renewed there (it was issued elsewhere): give that process a fresh one, or its own sign-in,
+before this one expires.
 
 ## 🧩 Driver manifest
 
