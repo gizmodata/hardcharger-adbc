@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Live tests (Go and Python) that an `append` ingest binds the upload's columns to the
+  table's by name: two INTEGER columns uploaded the other way round land under their own
+  names, an omitted column takes its default, and a column the table lacks is refused with
+  nothing written. Hardcharger 2.0.0 bound by position and stored the swapped columns
+  crosswise (found by a customer); the server fix is Warp SQL 1.0.2's, in the Hardcharger
+  release after 2.0.0, and these tests fail against 2.0.0.
+
 ## [2.0.2] - 2026-10-22
 
 ### Fixed

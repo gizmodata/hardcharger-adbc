@@ -157,6 +157,37 @@ def test_ddl_dml_and_bulk_ingest(conn):
         assert cur.fetchall() == [("Boston",), ("Denver",)]
 
 
+def test_append_binds_columns_by_name(conn):
+    # The upload's columns may come in any order: each lands in the table column of its
+    # name, and a column the upload omits takes its default. Two INTEGER columns the other
+    # way round are the case a server binding by position would store crosswise, silently
+    # (Hardcharger 2.0.0 did; found by a customer).
+    import pyarrow as pa
+
+    with conn.cursor() as cur:
+        cur.execute(
+            operation="CREATE OR REPLACE TABLE by_name (a INTEGER, b INTEGER, c VARCHAR DEFAULT 'dflt')"
+        )
+        rows = cur.adbc_ingest(
+            table_name="by_name",
+            data=pa.table(
+                {"b": pa.array([10, 20], type=pa.int32()), "a": pa.array([1, 2], type=pa.int32())}
+            ),
+            mode="append",
+        )
+        assert rows == 2
+        cur.execute(operation="SELECT a, b, c FROM by_name ORDER BY a")
+        assert cur.fetchall() == [(1, 10, "dflt"), (2, 20, "dflt")]
+        with pytest.raises(expected_exception=hardcharger.ProgrammingError, match="nope"):
+            cur.adbc_ingest(
+                table_name="by_name",
+                data=pa.table({"a": pa.array([3], type=pa.int32()), "nope": pa.array([0], type=pa.int32())}),
+                mode="append",
+            )
+        cur.execute(operation="SELECT count(*) FROM by_name")
+        assert cur.fetchone() == (2,)
+
+
 # --- TLS -----------------------------------------------------------------------------------
 
 
