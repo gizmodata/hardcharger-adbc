@@ -19,10 +19,12 @@ released first.
    GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go list -m github.com/gizmodata/chargewire-adbc/go/v2@vX.Y.Z
    ```
 
-2. **Move `go/go.mod` from the pseudo-version to that release**, on `main`:
+2. **Move `go/go.mod` to that release** (from a pseudo-version, or from a `replace` of a local
+   checkout), on `main`:
 
    ```bash
    cd go
+   go mod edit -dropreplace github.com/gizmodata/chargewire-adbc/go/v2
    go get github.com/gizmodata/chargewire-adbc/go/v2@vX.Y.Z
    go mod tidy
    cd ..
@@ -54,14 +56,3 @@ released first.
    gh release view vX.Y.Z -R gizmodata/hardcharger-adbc --json assets --jq '.assets[].name'
    GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go list -m github.com/gizmodata/hardcharger-adbc/go/v2@vX.Y.Z
    ```
-
-## While the repositories are internal
-
-`go/go.mod` keeps the pseudo-version of chargewire-adbc (`v0.0.0-<date>-<sha>`, fetched over SSH
-with the `CHARGEWIRE_ADBC_DEPLOY_KEY` deploy key and `GOPRIVATE=github.com/gizmodata/*`,
-`.github/actions/go-private`) until chargewire-adbc's `go/vX.Y.Z` tag exists and is public:
-`proxy.golang.org` cannot read an internal repository, and the released version does not exist
-before the tag. `go-module.yml` refuses a pseudo-version, so a `go/vX.Y.Z` tag of this module
-cannot be pushed before step 2. Once both repositories are public, remove
-`.github/actions/go-private`, its uses in `ci.yml`, `release.yml` and `go-module.yml`, the
-`CHARGEWIRE_ADBC_DEPLOY_KEY` secret and the `GOPRIVATE` notes in the README.

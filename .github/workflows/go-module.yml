@@ -8,9 +8,6 @@ name: go-module
 # depends on a released chargewire-adbc/go/v2 version rather than a pseudo-version, go.mod and go.sum
 # are tidy, it builds, vets and passes the unit tests), then fetches the version through
 # proxy.golang.org, so it is cached immutably, and asks pkg.go.dev to render it.
-#
-# The proxy cannot read an internal repository: push go/v* tags only once this repository and
-# chargewire-adbc are public (the `warm` job fails until then, and can be re-run).
 
 on:
   push:
@@ -30,18 +27,10 @@ jobs:
   check:
     name: The tag is a release of the Go module
     runs-on: ubuntu-24.04
-    env:
-      # While chargewire-adbc is private, Go reads it over SSH with its deploy key (ci.yml does the
-      # same). Once it is public the secret is removed and this step is skipped.
-      HAVE_DEPLOY_KEY: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the paired v* tag
-      - uses: ./.github/actions/go-private
-        if: env.HAVE_DEPLOY_KEY == 'true'
-        with:
-          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod

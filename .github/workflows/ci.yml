@@ -8,13 +8,9 @@ name: ci
 #     against a server on the default port;
 #   - the library and Python unit tests on macOS and Windows.
 #
-# Access, with no personal token, while the pieces this builds on are private (unnecessary once
-# they are public):
-#   - github.com/gizmodata/chargewire-adbc (a Go module dependency) through the
-#     CHARGEWIRE_ADBC_DEPLOY_KEY secret, a read-only deploy key of that repository;
-#   - hardcharger-server from the image ghcr.io/gizmodata/hardcharger, pulled with this
-#     workflow's GITHUB_TOKEN; the package grants this repository read access (package
-#     settings, Manage Actions access).
+# hardcharger-server comes from the image ghcr.io/gizmodata/hardcharger, pulled with this
+# workflow's GITHUB_TOKEN (no personal token); the package grants this repository read access
+# (package settings, Manage Actions access). The Go module dependencies are public.
 
 on:
   push:
@@ -56,9 +52,6 @@ jobs:
       - uses: actions/checkout@v7
       - name: PyPI description mirrors the repository README
         run: scripts/sync_python_readme.sh --check
-      - uses: ./.github/actions/go-private
-        with:
-          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
@@ -160,9 +153,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/go-private
-        with:
-          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod

@@ -76,9 +76,6 @@ jobs:
           [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME != v$version"; exit 1; }
           grep -q "^## \[$version\]" CHANGELOG.md || { echo "::error::no CHANGELOG.md section for $version"; exit 1; }
 
-      - uses: ./.github/actions/go-private
-        with:
-          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
