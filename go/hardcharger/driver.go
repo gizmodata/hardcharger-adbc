@@ -97,6 +97,7 @@ type database struct {
 func (db *database) take(opts map[string]string) (map[string]string, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+	opts = currentOptions(opts)
 	chargewireOpts := make(map[string]string, len(opts))
 	// A map has no order: apply settings in a stable (sorted) one.
 	keys := make([]string, 0, len(opts))

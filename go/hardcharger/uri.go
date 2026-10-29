@@ -46,7 +46,7 @@ func ToChargewireURI(raw string) (string, error) {
 		return "", invalidArgument("%s:// is not a Hardcharger URI scheme: use hardcharger://host:port for HTTPS, "+
 			"or hardcharger://host:port?tls=false for plain HTTP", u.Scheme)
 	default:
-		return raw, nil // chargewire://, https://, http://, or something the Chargewire driver refuses
+		return currentURI(raw, u.Scheme), nil // chargewire://, https://, http://, or something the Chargewire driver refuses
 	}
 	if u.Hostname() == "" {
 		return "", invalidArgument("invalid uri %q: no host", u.Redacted())
@@ -54,7 +54,7 @@ func ToChargewireURI(raw string) (string, error) {
 	if u.Port() == "" {
 		u.Host = net.JoinHostPort(u.Hostname(), strconv.Itoa(DefaultPort))
 	}
-	u.Scheme = "chargewire"
+	u.Scheme = currentScheme
 	return u.String(), nil
 }
 

@@ -55,6 +55,7 @@ from adbc_driver_manager.dbapi import (  # noqa: F401
 )
 
 from ._driver import _driver_path
+from ._legacy import current_options
 from ._options import ConnectionOptions, DatabaseOptions
 
 PemSource = Union[str, bytes, "os.PathLike[str]"]
@@ -398,8 +399,8 @@ def connect(
     if share_sign_in is not False and auth_type != "external":
         raise ValueError("share_sign_in shares a browser sign-in: it needs auth_type='external'")
 
-    db_kwargs = dict(db_kwargs or {})
-    conn_kwargs = dict(conn_kwargs or {})
+    db_kwargs = current_options(options=db_kwargs or {})
+    conn_kwargs = current_options(options=conn_kwargs or {})
     options = DatabaseOptions
 
     def put(key: str, value: Optional[str]) -> None:

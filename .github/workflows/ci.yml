@@ -38,6 +38,9 @@ env:
   # :main rather than a pinned :sha- so the driver keeps up with the server it ships beside; pin a
   # :sha- here to reproduce an old run.
   HARDCHARGER_IMAGE: ghcr.io/gizmodata/hardcharger:main
+  # The last server released before the protocol's rename: the live suites check that the driver
+  # still works with it (HARDCHARGER_ADBC_TEST_LEGACY_*; those tests fail, not skip, once set).
+  HARDCHARGER_LEGACY_IMAGE: ghcr.io/gizmodata/hardcharger:2.2.0
   # The ADBC C driver manager for the C example (apache/arrow-adbc release).
   ARROW_ADBC_TAG: apache-arrow-adbc-24
 
@@ -67,6 +70,24 @@ jobs:
         with:
           image: ${{ env.HARDCHARGER_IMAGE }}
           token: ${{ github.token }}
+      - name: A server from before the rename
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          password="$(openssl rand -hex 12):p@ss"
+          echo "::add-mask::$password"
+          printf '%s' "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin >/dev/null
+          docker run -d --name hardcharger-legacy -p 127.0.0.1:31400:31337 \
+            -e HARDCHARGER_ADMIN_PASSWORD="$password" "$HARDCHARGER_LEGACY_IMAGE" >/dev/null
+          docker logout ghcr.io >/dev/null
+          # Any HTTP answer means it is up; the tests check that the driver can use it.
+          for _ in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:31400/ && break; sleep 1; done
+          curl -s -o /dev/null http://127.0.0.1:31400/
+          {
+            echo "HARDCHARGER_ADBC_TEST_LEGACY_URI=hardcharger://127.0.0.1:31400?tls=false"
+            echo "HARDCHARGER_ADBC_TEST_LEGACY_PASSWORD=$password"
+          } >> "$GITHUB_ENV"
 
       - name: gofmt and vet
         working-directory: go

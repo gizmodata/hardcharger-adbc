@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The driver now uses the Chargewire protocol and is built on the Chargewire ADBC driver (Go
+  module `github.com/gizmodata/chargewire-adbc/go/v2`). The options it passes through are now
+  `adbc.chargewire.*` (as named by `DatabaseOptions`, `ConnectionOptions` and
+  `StatementOptions`), `chargewire://` URIs pass through as they are, the Go URI helper is
+  `ToChargewireURI`, and errors carry their details as `chargewire.code`,
+  `chargewire.request_id`, `chargewire.reason` and `chargewire.cancel_reason`: code that reads
+  an error's details by key must use these. Connection strings, option keys and the Go URI
+  helper's name from before the rename keep working.
+- It still works with Hardcharger servers released before the rename (2.2.0 and earlier): at the
+  default base path the driver talks to such a server in its own spelling of the protocol, for
+  every connection of the database. CI runs the live suites against the 2.2.0 image as well.
+
 ## [2.0.2] - 2026-10-22
 
 ### Fixed
