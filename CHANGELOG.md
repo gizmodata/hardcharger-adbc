@@ -19,6 +19,8 @@ All notable changes to this project are documented here. The format follows
 - It still works with Hardcharger servers released before the rename (2.2.0 and earlier): at the
   default base path the driver talks to such a server in its own spelling of the protocol, for
   every connection of the database. CI runs the live suites against the 2.2.0 image as well.
+- Built on the released Chargewire ADBC driver, `github.com/gizmodata/chargewire-adbc/go/v2`
+  v2.0.0.
 
 ## [2.0.2] - 2026-10-22
 
