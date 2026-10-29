@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-29
+
 ### Changed
 
 - The driver now uses the Chargewire protocol and is built on the Chargewire ADBC driver (Go
