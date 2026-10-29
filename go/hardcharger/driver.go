@@ -1,12 +1,12 @@
 // Licensed under the Apache License, Version 2.0.
 
 // Package hardcharger is the ADBC driver for Hardcharger, GizmoData's DuckDB
-// 2.0 server, built on the Warp SQL ADBC driver
-// (github.com/gizmodata/warp-sql-adbc/go/warpsql), which does the work:
+// 2.0 server, built on the Chargewire ADBC driver
+// (github.com/gizmodata/chargewire-adbc/go/v2/chargewire), which does the work:
 // Arrow IPC streaming, parameters, bulk ingest, partitioned results, cancel,
 // retries, TLS and token sign-in. This package adds:
 //
-//   - hardcharger://host[:port] URIs, meaning exactly warp:// (HTTPS unless
+//   - hardcharger://host[:port] URIs, meaning exactly chargewire:// (HTTPS unless
 //     ?tls=false), with Hardcharger's port 31337 as the default;
 //
 //   - "ADBC Hardcharger Driver - Go" as the driver name in GetInfo (the
@@ -14,7 +14,7 @@
 //
 //   - Hardcharger's options (adbc.hardcharger.*): session and query tags,
 //     hardcharger.* settings, browser sign-in, and client certificate
-//     sign-in (auth_type=client_certificate, the Warp SQL driver's).
+//     sign-in (auth_type=client_certificate, the Chargewire driver's).
 //
 //     drv := hardcharger.NewDriver(memory.DefaultAllocator)
 //     db, err := drv.NewDatabaseWithContext(ctx, map[string]string{
@@ -40,35 +40,35 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/gizmodata/warp-sql-adbc/go/warpsql"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
 // DriverName is what GetInfo reports as the driver name.
 const DriverName = "ADBC Hardcharger Driver - Go"
 
-// optionAccessToken is the Warp SQL driver's option for a token issued
+// optionAccessToken is the Chargewire driver's option for a token issued
 // elsewhere: here, the server's own token from a browser sign-in.
-const optionAccessToken = "adbc.warp.auth.access_token"
+const optionAccessToken = "adbc.chargewire.auth.access_token"
 
 // NewDriver returns the Hardcharger ADBC driver.
 func NewDriver(alloc memory.Allocator) driverbase.Driver {
-	return &driverImpl{inner: warpsql.NewDriverWithName(alloc, DriverName)}
+	return &driverImpl{inner: chargewire.NewDriverWithName(alloc, DriverName)}
 }
 
 type driverImpl struct {
 	inner driverbase.Driver
 }
 
-// NewDatabaseWithContext takes the Warp SQL driver's options and
+// NewDatabaseWithContext takes the Chargewire driver's options and
 // Hardcharger's; nothing is sent to the server until the first connection
 // opens.
 func (d *driverImpl) NewDatabaseWithContext(ctx context.Context, opts map[string]string) (adbc.DatabaseWithContext, error) {
-	db := &database{cfg: newConfig(), warpOptions: map[string]string{}}
-	warpOpts, err := db.take(opts)
+	db := &database{cfg: newConfig(), chargewireOptions: map[string]string{}}
+	chargewireOpts, err := db.take(opts)
 	if err != nil {
 		return nil, err
 	}
-	inner, err := d.inner.NewDatabaseWithContext(ctx, warpOpts)
+	inner, err := d.inner.NewDatabaseWithContext(ctx, chargewireOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -76,16 +76,16 @@ func (d *driverImpl) NewDatabaseWithContext(ctx context.Context, opts map[string
 	return db, nil
 }
 
-// database wraps the Warp SQL database.
+// database wraps the Chargewire database.
 type database struct {
 	driverbase.Database
 
-	mu          sync.Mutex
-	cfg         *config
-	uri         string            // as given (hardcharger://...)
-	warpURI     string            // as handed to the Warp SQL driver
-	warpOptions map[string]string // Warp SQL options seen, for the sign-in's TLS
-	signedIn    bool
+	mu                sync.Mutex
+	cfg               *config
+	uri               string            // as given (hardcharger://...)
+	chargewireURI     string            // as handed to the Chargewire driver
+	chargewireOptions map[string]string // Chargewire options seen, for the sign-in's TLS
+	signedIn          bool
 	// shared and sharedToken are the shared sign-in this database took its
 	// token from, when it did not sign in itself (OptionOAuthShareSignIn).
 	shared      *sharedSignIn
@@ -93,11 +93,11 @@ type database struct {
 }
 
 // take records Hardcharger's options and translates the URI; it returns the
-// options for the Warp SQL driver.
+// options for the Chargewire driver.
 func (db *database) take(opts map[string]string) (map[string]string, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	warpOpts := make(map[string]string, len(opts))
+	chargewireOpts := make(map[string]string, len(opts))
 	// A map has no order: apply settings in a stable (sorted) one.
 	keys := make([]string, 0, len(opts))
 	for key := range opts {
@@ -108,29 +108,29 @@ func (db *database) take(opts map[string]string) (map[string]string, error) {
 		value := opts[key]
 		switch {
 		case key == OptionIngestParts:
-			warpOpts[warpIngestParts] = value
+			chargewireOpts[chargewireIngestParts] = value
 		case key == OptionAuthType:
 			if err := db.cfg.set(key, value); err != nil {
 				return nil, err
 			}
-			warpOpts[warpAuthType] = warpAuthTypeFor(db.cfg.authType)
+			chargewireOpts[chargewireAuthType] = chargewireAuthTypeFor(db.cfg.authType)
 		case isHardchargerOption(key):
 			if err := db.cfg.set(key, value); err != nil {
 				return nil, err
 			}
 		case key == adbc.OptionKeyURI:
-			translated, err := ToWarpURI(value)
+			translated, err := ToChargewireURI(value)
 			if err != nil {
 				return nil, err
 			}
-			db.uri, db.warpURI = value, translated
-			warpOpts[key] = translated
+			db.uri, db.chargewireURI = value, translated
+			chargewireOpts[key] = translated
 		default:
-			warpOpts[key] = value
-			db.warpOptions[key] = value
+			chargewireOpts[key] = value
+			db.chargewireOptions[key] = value
 		}
 	}
-	return warpOpts, nil
+	return chargewireOpts, nil
 }
 
 func (db *database) SetOption(ctx context.Context, key, value string) error {
@@ -138,15 +138,15 @@ func (db *database) SetOption(ctx context.Context, key, value string) error {
 }
 
 func (db *database) SetOptions(ctx context.Context, opts map[string]string) error {
-	warpOpts, err := db.take(opts)
+	chargewireOpts, err := db.take(opts)
 	if err != nil {
 		return err
 	}
 	// One at a time through SetOption: driverbase's SetOptions is
-	// DatabaseImplBase's, which knows none of the Warp SQL driver's options.
-	keys := slices.Sorted(maps.Keys(warpOpts))
+	// DatabaseImplBase's, which knows none of the Chargewire driver's options.
+	keys := slices.Sorted(maps.Keys(chargewireOpts))
 	for _, key := range keys {
-		if err := db.Database.SetOption(ctx, key, warpOpts[key]); err != nil {
+		if err := db.Database.SetOption(ctx, key, chargewireOpts[key]); err != nil {
 			return err
 		}
 	}
@@ -158,7 +158,7 @@ func (db *database) GetOption(ctx context.Context, key string) (string, error) {
 	defer db.mu.Unlock()
 	switch {
 	case key == OptionIngestParts:
-		return db.Database.GetOption(ctx, warpIngestParts)
+		return db.Database.GetOption(ctx, chargewireIngestParts)
 	case isHardchargerOption(key):
 		return db.cfg.get(key)
 	case key == adbc.OptionKeyURI && db.uri != "":
@@ -168,7 +168,7 @@ func (db *database) GetOption(ctx context.Context, key string) (string, error) {
 }
 
 // Open signs in through the browser first when auth_type is external, then
-// opens a Warp SQL connection and applies the session's tags and settings.
+// opens a Chargewire connection and applies the session's tags and settings.
 func (db *database) Open(ctx context.Context) (adbc.ConnectionWithContext, error) {
 	if err := db.signIn(ctx); err != nil {
 		return nil, err
@@ -208,16 +208,16 @@ func (db *database) signIn(ctx context.Context) error {
 	if db.cfg.authType != AuthTypeExternal || db.signedIn {
 		return nil
 	}
-	warpOptions := maps.Clone(db.warpOptions)
-	warpOptions[adbc.OptionKeyURI] = db.warpURI
+	chargewireOptions := maps.Clone(db.chargewireOptions)
+	chargewireOptions[adbc.OptionKeyURI] = db.chargewireURI
 	run := func(ctx context.Context) (string, time.Duration, error) {
-		return browserSignIn(ctx, warpOptions, db.cfg.browser, db.cfg.oauthTimeout)
+		return browserSignIn(ctx, chargewireOptions, db.cfg.browser, db.cfg.oauthTimeout)
 	}
 	var token string
 	var err error
 	db.shared, db.sharedToken = nil, ""
 	if db.cfg.shareSignIn {
-		shared := sharedSignInFor(signInKeyFor(db.warpURI, warpOptions, db.cfg.signInKey))
+		shared := sharedSignInFor(signInKeyFor(db.chargewireURI, chargewireOptions, db.cfg.signInKey))
 		var fresh bool
 		if token, fresh, err = shared.get(ctx, run); err != nil {
 			return err
@@ -245,7 +245,7 @@ func (db *database) refusedSharedToken(err error) bool {
 	if db.shared == nil || !errors.As(err, &adbcErr) || adbcErr.Code != adbc.StatusUnauthenticated {
 		return false
 	}
-	// Warp SQL §4.2: after token_revoked, credentials_changed or principal_dropped the
+	// Chargewire §4.2: after token_revoked, credentials_changed or principal_dropped the
 	// person is told why rather than sent through another sign-in on their behalf.
 	if !renewableRefusal(adbcErr) {
 		return false
@@ -255,7 +255,7 @@ func (db *database) refusedSharedToken(err error) bool {
 	return true
 }
 
-// connection wraps the Warp SQL connection.
+// connection wraps the Chargewire connection.
 type connection struct {
 	driverbase.Connection
 }
@@ -282,7 +282,7 @@ func (c *connection) applyDefaults(ctx context.Context, cfg *config) error {
 
 func (c *connection) SetOption(ctx context.Context, key, value string) error {
 	if key == OptionIngestParts {
-		key = warpIngestParts
+		key = chargewireIngestParts
 	}
 	name, global, err := connectionSetting(key)
 	if err != nil {
@@ -296,7 +296,7 @@ func (c *connection) SetOption(ctx context.Context, key, value string) error {
 
 func (c *connection) GetOption(ctx context.Context, key string) (string, error) {
 	if key == OptionIngestParts {
-		key = warpIngestParts
+		key = chargewireIngestParts
 	}
 	name, _, err := connectionSetting(key)
 	if err != nil {
@@ -392,11 +392,11 @@ var _ driverbase.Database = (*database)(nil)
 var _ driverbase.Connection = (*connection)(nil)
 
 // renewableRefusal reports whether a refused token may be replaced by signing in
-// again (Warp SQL §4.2): a refusal without a reason, token_expired, or a reason this
+// again (Chargewire §4.2): a refusal without a reason, token_expired, or a reason this
 // driver doesn't know.
 func renewableRefusal(err adbc.Error) bool {
 	for _, detail := range err.Details {
-		if detail.Key() != warpsql.ErrorDetailReason {
+		if detail.Key() != chargewire.ErrorDetailReason {
 			continue
 		}
 		value, serr := detail.Serialize()

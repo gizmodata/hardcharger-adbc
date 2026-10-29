@@ -19,7 +19,7 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"  # pyarrow 26 needs 3.11
 authors = [{ name = "GizmoData", email = "support@gizmodata.com" }]
-keywords = ["adbc", "arrow", "dbapi", "duckdb", "hardcharger", "warp-sql"]
+keywords = ["adbc", "arrow", "dbapi", "duckdb", "hardcharger", "chargewire"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",

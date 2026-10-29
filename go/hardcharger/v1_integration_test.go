@@ -2,7 +2,7 @@
 
 //go:build integration
 
-// Warp SQL protocol 1.0.0, through the Hardcharger driver against a live
+// Chargewire protocol 1.0.0, through the Hardcharger driver against a live
 // hardcharger-server.
 
 package hardcharger
@@ -14,7 +14,7 @@ import (
 	"github.com/apache/arrow-adbc/go/adbc"
 )
 
-const optionSessionTransaction = "adbc.warp.session.transaction"
+const optionSessionTransaction = "adbc.chargewire.session.transaction"
 
 func execUpdate(t *testing.T, cnxn adbc.ConnectionWithContext, sql string) {
 	t.Helper()
@@ -66,9 +66,9 @@ func TestIntegrationSessionTransactionIsTheServers(t *testing.T) {
 func TestIntegrationNoClientCertificateIsCertificateRequired(t *testing.T) {
 	ca := newCertificateAuthority(t)
 	server := startServer(t, ca.mtlsServerArgs()...)
-	_, _, err := open(t, server, map[string]string{"adbc.warp.tls.root_certs": ca.caPEM})
+	_, _, err := open(t, server, map[string]string{"adbc.chargewire.tls.root_certs": ca.caPEM})
 	wantStatus(t, err, adbc.StatusUnauthenticated, "certificate")
-	if code := warpCode(err); code != "certificate_required" {
-		t.Fatalf("warp.code %q: %v", code, err)
+	if code := chargewireCode(err); code != "certificate_required" {
+		t.Fatalf("chargewire.code %q: %v", code, err)
 	}
 }

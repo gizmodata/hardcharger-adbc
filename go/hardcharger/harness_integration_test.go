@@ -151,7 +151,7 @@ func launchServer(extraArgs []string) (*testServer, error) {
 	}
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(fmt.Sprintf("%s://127.0.0.1:%d/warp", scheme, port))
+		resp, err := client.Get(fmt.Sprintf("%s://127.0.0.1:%d/chargewire", scheme, port))
 		if err == nil {
 			_ = resp.Body.Close()
 			return server, nil
@@ -300,14 +300,14 @@ func info(t *testing.T, cnxn adbc.ConnectionWithContext) map[adbc.InfoCode]strin
 	return values
 }
 
-// warpCode is the Warp SQL error code the driver put in an error's details.
-func warpCode(err error) string {
+// chargewireCode is the Chargewire error code the driver put in an error's details.
+func chargewireCode(err error) string {
 	var adbcErr adbc.Error
 	if !errorsAsADBC(err, &adbcErr) {
 		return ""
 	}
 	for _, detail := range adbcErr.Details {
-		if detail.Key() == "warp.code" {
+		if detail.Key() == "chargewire.code" {
 			if value, err := detail.Serialize(); err == nil {
 				return string(value)
 			}

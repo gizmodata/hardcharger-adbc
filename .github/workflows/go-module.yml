@@ -5,12 +5,12 @@ name: go-module
 # vX.Y.Z tag release.yml acts on (RELEASING.md). release.yml's `v*` trigger does not match go/v*,
 # and nothing here publishes: the Go module proxy publishes a version by serving it. This workflow
 # checks that the tagged commit is a release of the module (the paired vX.Y.Z tag is on it, it
-# depends on a released warp-sql-adbc/go version rather than a pseudo-version, go.mod and go.sum
+# depends on a released chargewire-adbc/go/v2 version rather than a pseudo-version, go.mod and go.sum
 # are tidy, it builds, vets and passes the unit tests), then fetches the version through
 # proxy.golang.org, so it is cached immutably, and asks pkg.go.dev to render it.
 #
 # The proxy cannot read an internal repository: push go/v* tags only once this repository and
-# warp-sql-adbc are public (the `warm` job fails until then, and can be re-run).
+# chargewire-adbc are public (the `warm` job fails until then, and can be re-run).
 
 on:
   push:
@@ -31,9 +31,9 @@ jobs:
     name: The tag is a release of the Go module
     runs-on: ubuntu-24.04
     env:
-      # While warp-sql-adbc is private, Go reads it over SSH with its deploy key (ci.yml does the
+      # While chargewire-adbc is private, Go reads it over SSH with its deploy key (ci.yml does the
       # same). Once it is public the secret is removed and this step is skipped.
-      HAVE_DEPLOY_KEY: ${{ secrets.WARP_SQL_ADBC_DEPLOY_KEY != '' }}
+      HAVE_DEPLOY_KEY: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,7 +41,7 @@ jobs:
       - uses: ./.github/actions/go-private
         if: env.HAVE_DEPLOY_KEY == 'true'
         with:
-          deploy-key: ${{ secrets.WARP_SQL_ADBC_DEPLOY_KEY }}
+          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
@@ -56,15 +56,15 @@ jobs:
           [ "$paired" = "$GITHUB_SHA" ] || { echo "::error::$version is at $paired, not at this commit ($GITHUB_SHA)"; exit 1; }
           echo "go/$version and $version both at $GITHUB_SHA"
 
-      - name: The module depends on a released warp-sql-adbc/go, not a pseudo-version
+      - name: The module depends on a released chargewire-adbc/go/v2, not a pseudo-version
         run: |
           set -euo pipefail
-          dep=$(sed -n 's:^[[:space:]]*github.com/gizmodata/warp-sql-adbc/go \(v[^ ]*\).*:\1:p' go/go.mod)
-          [ -n "$dep" ] || { echo "::error::go/go.mod does not require github.com/gizmodata/warp-sql-adbc/go"; exit 1; }
+          dep=$(sed -n 's:^[[:space:]]*github.com/gizmodata/chargewire-adbc/go/v2 \(v[^ ]*\).*:\1:p' go/go.mod)
+          [ -n "$dep" ] || { echo "::error::go/go.mod does not require github.com/gizmodata/chargewire-adbc/go/v2"; exit 1; }
           case "$dep" in
-            v0.0.0-*) echo "::error::go/go.mod requires warp-sql-adbc/go at the pseudo-version $dep: move it to a released go/vX.Y.Z of warp-sql-adbc first (RELEASING.md)"; exit 1 ;;
+            v0.0.0-*) echo "::error::go/go.mod requires chargewire-adbc/go/v2 at the pseudo-version $dep: move it to a released go/vX.Y.Z of chargewire-adbc first (RELEASING.md)"; exit 1 ;;
           esac
-          echo "warp-sql-adbc/go $dep"
+          echo "chargewire-adbc/go/v2 $dep"
 
       - name: go.mod and go.sum are tidy
         working-directory: go

@@ -31,7 +31,7 @@ const sharedSignInMargin = time.Minute
 
 // signInKey says which databases may share a sign-in.
 type signInKey struct {
-	server string // the Warp SQL server: scheme, host, port and base path
+	server string // the Chargewire server: scheme, host, port and base path
 	trust  string // the TLS trust (root certificates, skip_verify, server name)
 	label  string // OptionOAuthSignInKey
 }
@@ -131,18 +131,18 @@ func renewTime(lifetime time.Duration, now time.Time) time.Time {
 }
 
 // signInKeyFor is the key of a database's browser sign-in.
-func signInKeyFor(warpURI string, warpOptions map[string]string, label string) signInKey {
-	server := warpURI
-	if u, err := url.Parse(warpURI); err == nil {
+func signInKeyFor(chargewireURI string, chargewireOptions map[string]string, label string) signInKey {
+	server := chargewireURI
+	if u, err := url.Parse(chargewireURI); err == nil {
 		tls := "tls"
-		if !usesTLS(warpURI) {
+		if !usesTLS(chargewireURI) {
 			tls = "plain"
 		}
 		server = tls + "://" + strings.ToLower(u.Host) + strings.TrimSuffix(u.Path, "/")
 	}
 	trust := sha256.New()
-	for _, option := range []string{"adbc.warp.tls.root_certs", "adbc.warp.tls.skip_verify", "adbc.warp.tls.server_name"} {
-		trust.Write([]byte(option + "=" + warpOptions[option] + "\x00"))
+	for _, option := range []string{"adbc.chargewire.tls.root_certs", "adbc.chargewire.tls.skip_verify", "adbc.chargewire.tls.server_name"} {
+		trust.Write([]byte(option + "=" + chargewireOptions[option] + "\x00"))
 	}
 	return signInKey{server: server, trust: hex.EncodeToString(trust.Sum(nil)), label: label}
 }

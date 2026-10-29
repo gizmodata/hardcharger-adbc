@@ -21,7 +21,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/memory"
 )
 
-// The driver inherits the Warp SQL driver's defaults: a large result is split
+// The driver inherits the Chargewire driver's defaults: a large result is split
 // into up to 32 partitions, and an upload of two batches or more goes in up to
 // 16 parts on a near link, 32 on a far one (`auto`; §6.10, §8.3).
 
@@ -52,7 +52,7 @@ func TestIntegrationALargeResultIsSplitByDefault(t *testing.T) {
 		t.Fatalf("%d partitions, want 2 to 32 (the default asks for up to 32)", n)
 	}
 	// The twin: one partition when asked for one.
-	cnxn := mustOpen(t, shared, map[string]string{"adbc.warp.statement.result_partitions": "1"})
+	cnxn := mustOpen(t, shared, map[string]string{"adbc.chargewire.statement.result_partitions": "1"})
 	if n := partitionCount(t, cnxn, largeResult); n != 1 {
 		t.Fatalf("%d partitions with result_partitions=1", n)
 	}
@@ -165,8 +165,8 @@ func TestIntegrationIngestPartsOption(t *testing.T) {
 	if single, opens, parts := proxy.ingestRequests(); single != 1 || opens != 0 || parts != 0 {
 		t.Fatalf("%d single, %d opens, %d parts; want one stream", single, opens, parts)
 	}
-	// The Warp SQL name works too.
-	proxy, cnxn = proxiedOpen(t, map[string]string{"adbc.warp.ingest.parts": "2"})
+	// The Chargewire name works too.
+	proxy, cnxn = proxiedOpen(t, map[string]string{"adbc.chargewire.ingest.parts": "2"})
 	ingest(t, cnxn, "two_parts")
 	if _, opens, parts := proxy.ingestRequests(); opens != 1 || parts != 2 {
 		t.Fatalf("%d opens, %d parts; want 2 parts", opens, parts)

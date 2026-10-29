@@ -12,7 +12,7 @@
   <a href="https://pypi.org/project/adbc-driver-hardcharger/"><img src="https://img.shields.io/badge/PyPI-adbc--driver--hardcharger-blue.svg?logo=PyPI" alt="PyPI"></a>
   <a href="https://pypi.org/project/adbc-driver-hardcharger/"><img src="https://img.shields.io/pepy/dt/adbc-driver-hardcharger.svg" alt="PyPI Downloads"></a>
   <a href="https://arrow.apache.org/adbc/"><img src="https://img.shields.io/badge/ADBC-1.12-f15a24.svg" alt="ADBC 1.12"></a>
-  <a href="https://github.com/gizmodata/warp-sql"><img src="https://img.shields.io/badge/protocol-Warp%20SQL-31a8db.svg" alt="Warp SQL protocol"></a>
+  <a href="https://github.com/gizmodata/chargewire"><img src="https://img.shields.io/badge/protocol-Chargewire-31a8db.svg" alt="Chargewire protocol"></a>
   <img src="https://img.shields.io/badge/core-Go-00ADD8.svg?logo=go&logoColor=white" alt="Go core">
   <img src="https://img.shields.io/badge/bindings-Python-3776AB.svg?logo=python&logoColor=white" alt="Python bindings">
   <a href="https://github.com/gizmodata/hardcharger"><img src="https://img.shields.io/badge/server-Hardcharger-f15a24.svg" alt="Hardcharger"></a>
@@ -28,11 +28,11 @@
 
 The [ADBC](https://arrow.apache.org/adbc/) driver for
 [Hardcharger™](https://github.com/gizmodata/hardcharger), GizmoData™'s DuckDB 2.0 server. It is
-a native Go driver built on the generic [Warp SQL ADBC driver](https://github.com/gizmodata/warp-sql-adbc),
+a native Go driver built on the generic [Chargewire ADBC driver](https://github.com/gizmodata/chargewire-adbc),
 which does the work (Arrow IPC streaming, bind parameters, cancel, retries, TLS, and by
 default results split into up to 32 partitions read at once and bulk ingests sent in up to
 16 or 32 parts), compiled to one C shared library, `libadbc_driver_hardcharger`, that
-every ADBC language loads. On top of Warp SQL it adds what is particular to Hardcharger, for
+every ADBC language loads. On top of Chargewire it adds what is particular to Hardcharger, for
 every language at once:
 
 - 🏎️ **`hardcharger://` URIs**, with Hardcharger's port 31337 as the default;
@@ -45,8 +45,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.0.1, compatible with Hardcharger 2.0.0.** Speaks the Warp SQL protocol 1.0.0, built on
-> [warp-sql-adbc](https://github.com/gizmodata/warp-sql-adbc) 1.0.0; tested against
+> **Status: 2.0.1, compatible with Hardcharger 2.0.0.** Speaks the Chargewire protocol 1.0.0, built on
+> [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 1.0.0; tested against
 > `hardcharger-server` 2.0.0.
 
 | Package | What it is |
@@ -126,10 +126,10 @@ in `go/`). The package is `github.com/gizmodata/hardcharger-adbc/go/v2/hardcharg
 | `hardcharger://host` | HTTPS to `host:31337` |
 | `hardcharger://host:port` | HTTPS to another port |
 | `hardcharger://host?tls=false` | Plain HTTP (development, loopback) |
-| `hardcharger://host:port/custom/prefix` | The server mounts Warp SQL under `/custom/prefix` |
-| `warp://…`, `https://…`, `http://…` | The Warp SQL driver's own spellings, as they are |
+| `hardcharger://host:port/custom/prefix` | The server mounts Chargewire under `/custom/prefix` |
+| `chargewire://…`, `https://…`, `http://…` | The Chargewire driver's own spellings, as they are |
 
-`hardcharger://` means exactly what Warp SQL's `warp://` means, so TLS is on unless the URI
+`hardcharger://` means exactly what Chargewire's `chargewire://` means, so TLS is on unless the URI
 says `?tls=false`. Pointed at a server that speaks plain HTTP, a TLS URI fails at once, having
 sent nothing but the TLS hello, with `The server at HOST:PORT speaks plain HTTP, not TLS. Add
 ?tls=false to the URI to connect without encryption.`; the driver never falls back to plaintext. There is deliberately no `hardcharger+http://`: one spelling for plain HTTP
@@ -138,14 +138,14 @@ driver refuses `hardcharger+http://` with a message naming `?tls=false`.
 
 ## ⚙️ Options
 
-Every option of the [Warp SQL driver](https://github.com/gizmodata/warp-sql-adbc#%EF%B8%8F-options)
-(`adbc.warp.*`: TLS, tokens, retries, compression, ...) applies, with its defaults. Two shape
-throughput, and the driver keeps the Warp SQL driver's defaults:
+Every option of the [Chargewire driver](https://github.com/gizmodata/chargewire-adbc#%EF%B8%8F-options)
+(`adbc.chargewire.*`: TLS, tokens, retries, compression, ...) applies, with its defaults. Two shape
+throughput, and the driver keeps the Chargewire driver's defaults:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `adbc.warp.statement.result_partitions` | 32 | A large result is split into up to this many partitions, read at once over their own connections (the server decides; a result of fewer than two batches is one stream). `1`: never split |
-| `adbc.warp.ingest.parts` (also `adbc.hardcharger.ingest.parts`) | `auto` | A bulk ingest of two batches or more goes over up to this many connections, committed as one. Its rows land in no defined order; `1`: one stream, in the upload's order |
+| `adbc.chargewire.statement.result_partitions` | 32 | A large result is split into up to this many partitions, read at once over their own connections (the server decides; a result of fewer than two batches is one stream). `1`: never split |
+| `adbc.chargewire.ingest.parts` (also `adbc.hardcharger.ingest.parts`) | `auto` | A bulk ingest of two batches or more goes over up to this many connections, committed as one. Its rows land in no defined order; `1`: one stream, in the upload's order |
 
 Hardcharger's own:
 
@@ -155,8 +155,8 @@ Hardcharger's own:
 | `adbc.hardcharger.session_tag` | database, connection | A JSON object tagging the session (`hardcharger.session_tag`) |
 | `adbc.hardcharger.setting.NAME` | database, connection | `SET SESSION hardcharger.NAME`: on every new session (database) or now (connection; `""` resets, and GetOption reads the value that applies) |
 | `adbc.hardcharger.global_setting.NAME` | connection | `SET GLOBAL hardcharger.NAME` (admins); `""` resets |
-| `adbc.hardcharger.ingest.parts` | database, connection | `adbc.warp.ingest.parts` under Hardcharger's name (on a statement, use the Warp SQL name) |
-| `adbc.hardcharger.auth_type` | database | `password` (default), `external` (browser sign-in), or `client_certificate` (also `mtls`): sign in with the client certificate alone; it is the Warp SQL driver's `adbc.warp.auth.type` |
+| `adbc.hardcharger.ingest.parts` | database, connection | `adbc.chargewire.ingest.parts` under Hardcharger's name (on a statement, use the Chargewire name) |
+| `adbc.hardcharger.auth_type` | database | `password` (default), `external` (browser sign-in), or `client_certificate` (also `mtls`): sign in with the client certificate alone; it is the Chargewire driver's `adbc.chargewire.auth.type` |
 | `adbc.hardcharger.oauth.timeout_seconds` | database | How long to wait for the sign-in (default 300) |
 | `adbc.hardcharger.oauth.browser` | database | Command that opens the sign-in page (the URL is appended); default `$HARDCHARGER_BROWSER`, else the system's; `none` prints the URL |
 | `adbc.hardcharger.oauth.share_sign_in` | database | `true`: share one browser sign-in among this process's databases that sign in to the same server (see [below](#one-sign-in-for-many-connections)); default `false` |
@@ -166,14 +166,14 @@ Tags are stored in `_hardcharger_instr.sql_statements.query_tag` and
 `_hardcharger_instr.sessions.session_tag` when the server runs with `--enable-instrumentation`;
 a tag that isn't a JSON object is refused with `Invalid JSON for query_tag`.
 
-`adbc.warp.session.transaction` (read-only, connection; Python
+`adbc.chargewire.session.transaction` (read-only, connection; Python
 `ConnectionOptions.SESSION_TRANSACTION`) is the session's transaction as the server reports it:
 `none`, `open`, `aborted`, or `unknown`. It sees SQL `BEGIN` and `COMMIT` too.
 
-Errors carry the server's error code in the detail `warp.code` (`sql_error`,
+Errors carry the server's error code in the detail `chargewire.code` (`sql_error`,
 `permission_denied`, ...), or a code beginning with `client_` for a failure the driver found
 in the server's answer (`client_protocol_error`; `client_http_error` for an error status
-without a problem document, such as a proxy's page). `warp.reason` and `warp.cancel_reason`
+without a problem document, such as a proxy's page). `chargewire.reason` and `chargewire.cancel_reason`
 say why a token or session stopped working or a statement was cancelled (`token_revoked`,
 `killed`, ...). After `token_revoked`, `credentials_changed` or `principal_dropped` the driver
 does not sign in again on its own.
@@ -199,7 +199,7 @@ They map to the options above, so they behave exactly as in C or Go.
 ## 🌐 Browser sign-in (SSO)
 
 When the server offers browser sign-in (`--oauth-client-id` and `--oauth-client-secret`, with
-the identity provider in `--token-allowed-issuer`; it then lists the Warp SQL capability
+the identity provider in `--token-allowed-issuer`; it then lists the Chargewire capability
 `oauth_browser`), sign in as yourself:
 
 ```python
@@ -207,7 +207,7 @@ with hardcharger.connect(uri="hardcharger://db.example.com", auth_type="external
     print(conn.current_user())  # the e-mail address you signed in with
 ```
 
-When the first connection opens, the driver asks the server for a sign-in flow (Warp SQL's
+When the first connection opens, the driver asks the server for a sign-in flow (Chargewire's
 browser sign-in, on the server's own port and URL: nothing else to configure on the client),
 opens the identity provider's page in your browser, waits, and receives the server's own
 access token. The identity provider's settings stay on the server. `open_browser=False`
@@ -256,15 +256,15 @@ with hardcharger.connect(uri="hardcharger://db.example.com", auth_type="client_c
 ```
 
 In C, Go and every other language, set `adbc.hardcharger.auth_type` to `client_certificate`
-with the Warp SQL driver's `adbc.warp.tls.client_cert` and `adbc.warp.tls.client_key` (PEM
-text; `adbc.warp.tls.root_certs` too when the server's certificate comes from a private CA):
+with the Chargewire driver's `adbc.chargewire.tls.client_cert` and `adbc.chargewire.tls.client_key` (PEM
+text; `adbc.chargewire.tls.root_certs` too when the server's certificate comes from a private CA):
 
 ```go
 db, err := hardcharger.NewDriver(memory.DefaultAllocator).NewDatabaseWithContext(ctx, map[string]string{
 	"uri":                      "hardcharger://db.example.com",
 	hardcharger.OptionAuthType: hardcharger.AuthTypeClientCertificate,
-	"adbc.warp.tls.client_cert": certPEM,
-	"adbc.warp.tls.client_key":  keyPEM,
+	"adbc.chargewire.tls.client_cert": certPEM,
+	"adbc.chargewire.tls.client_key":  keyPEM,
 })
 ```
 
@@ -275,7 +275,7 @@ connection it opens (result partitions, ingest parts) presents the same one. The
 a user name, password or token beside `client_certificate`, a missing certificate or key, and
 plain HTTP before sending anything, and a server that doesn't offer certificate sign-in
 (capability `mtls_identity`) before trying it. The server's refusals carry its code in
-`warp.code`: `unknown_certificate_identity`, `certificate_mismatch` (a token bound to another
+`chargewire.code`: `unknown_certificate_identity`, `certificate_mismatch` (a token bound to another
 certificate), `certificate_required` (also when the server refuses a connection without a
 certificate at the TLS handshake), `certificate_revoked`, and `certificate_identity_mismatch`.
 
@@ -283,7 +283,7 @@ certificate at the TLS handshake), `certificate_revoked`, and `certificate_ident
 
 A program that already holds a token from your identity provider (an OpenID Connect ID token
 or another JWT: a workload identity, a CI job's token, a token your web app got at sign-in)
-signs in with it directly: the driver exchanges it for a Hardcharger access token (Warp SQL's
+signs in with it directly: the driver exchanges it for a Hardcharger access token (Chargewire's
 `token_exchange` grant), with no password and no browser. The server checks the token against
 the provider's keys, issuer and audience:
 
@@ -299,13 +299,13 @@ with hardcharger.connect(uri="hardcharger://db.example.com", subject_token=id_to
     print(conn.current_user())  # the token's e-mail address
 ```
 
-`subject_token=` is the Warp SQL driver's `adbc.warp.auth.subject_token` (in C, Go and every
+`subject_token=` is the Chargewire driver's `adbc.chargewire.auth.subject_token` (in C, Go and every
 other language, set that option). Python refuses it beside `username`, `password`,
 `access_token`, `auth_type="external"` or `"client_certificate"`, and a different value for the
 same option in `db_kwargs`: the driver would otherwise use one credential and ignore the
 others. A token the server doesn't accept (another issuer or audience, expired, a bad
 signature, an e-mail address outside `--token-authorized-emails`) is refused with
-`UNAUTHENTICATED` and `warp.code` `invalid_credentials`. The driver exchanges the token when
+`UNAUTHENTICATED` and `chargewire.code` `invalid_credentials`. The driver exchanges the token when
 the first connection opens, and again shortly before Hardcharger's access token expires, as
 long as your provider's token is still valid. Once that token has expired the server refuses
 the next exchange (`invalid_credentials`), so open a new connection with a fresh
@@ -315,7 +315,7 @@ the next exchange (`invalid_credentials`), so open a new connection with a fresh
 
 When the URI's host isn't the name on the server's certificate (you connect by IP address, or
 through a tunnel, port forward or load balancer), give the name with `tls_server_name=` (option
-`adbc.warp.tls.server_name`). The driver sends it as the TLS server name (SNI), so a proxy or
+`adbc.chargewire.tls.server_name`). The driver sends it as the TLS server name (SNI), so a proxy or
 ingress that routes on SNI sends the connection to the right server, and checks the
 certificate against it instead of the URI's host:
 
@@ -420,10 +420,10 @@ with hardcharger.connect(uri="hardcharger://db.example.com", access_token=token,
         cur.execute(operation="COMMIT")
 ```
 
-They are the Warp SQL driver's database options `adbc.warp.session.id` and
-`adbc.warp.session.close_on_release` (a connection option too, settable any time), in every
-language. Opening checks the session (`GET /warp/v1/sessions/{id}`) and creates none: an id the
-server doesn't have, or another user's session, fails with `NotFound` and `warp.code`
+They are the Chargewire driver's database options `adbc.chargewire.session.id` and
+`adbc.chargewire.session.close_on_release` (a connection option too, settable any time), in every
+language. Opening checks the session (`GET /chargewire/v1/sessions/{id}`) and creates none: an id the
+server doesn't have, or another user's session, fails with `NotFound` and `chargewire.code`
 `session_not_found` (the server answers both the same way). Closing an attached connection
 leaves the session (`close_session_on_release` defaults to `False` for it, `True` for a
 session the connection created); it ends when a connection with `True` closes or when it idles
@@ -445,12 +445,12 @@ the new one; or the `access_token` you gave `connect()`, as it is.
 with hardcharger.connect(uri="hardcharger://db.example.com", username="hardcharger", password="change-me") as conn:
     token = conn.access_token              # a bearer secret: never log it
     print(conn.access_token_expires_at)    # e.g. 2026-10-20 16:14:13+00:00 (None when unknown)
-    print(conn.adbc_connection.get_option(key="adbc.warp.auth.access_token_expires_at"))
+    print(conn.adbc_connection.get_option(key="adbc.chargewire.auth.access_token_expires_at"))
     # '2026-10-20T16:14:13Z'
 ```
 
-They are the Warp SQL driver's `adbc.warp.auth.access_token` and
-`adbc.warp.auth.access_token_expires_at` (read-only; RFC 3339 UTC, from the token response's
+They are the Chargewire driver's `adbc.chargewire.auth.access_token` and
+`adbc.chargewire.auth.access_token_expires_at` (read-only; RFC 3339 UTC, from the token response's
 `expires_in` or the token's own `exp`, `""` when unknown), readable on the database and the
 connection in every language. The token works as `Authorization: Bearer <token>` on the
 server's HTTP API, and with `session_id` it lets another process carry on in this connection's
@@ -481,7 +481,7 @@ tarball, and install it as `hardcharger.toml` in `~/.config/adbc/drivers/` (Linu
 ## 📂 Layout
 
 ```
-go/hardcharger/      the driver (package hardcharger), on warp-sql-adbc's go/warpsql
+go/hardcharger/      the driver (package hardcharger), on chargewire-adbc's go/chargewire
 go/pkg/hardcharger/  cgo exports for the C shared library (generated: make -C go regenerate)
 go/examples/hello/   the Go example
 python/              adbc-driver-hardcharger: ships the library in its wheel, adds dbapi.connect()
@@ -491,8 +491,8 @@ packaging/           the driver manifest template
 
 ## 🛠️ Building and testing
 
-Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.11+. The Warp SQL
-driver is the Go module `github.com/gizmodata/warp-sql-adbc/go`, pinned to its released v1.0.0
+Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.11+. The Chargewire
+driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.0.0
 in `go/go.mod`.
 
 ```bash

@@ -88,7 +88,9 @@ def _wait_up(server: Server, timeout: float = 30) -> None:
         if server.process.poll() is not None:
             break
         try:
-            with urllib.request.urlopen(url=f"{server.base_url}/warp", timeout=2, context=context):
+            with urllib.request.urlopen(
+                url=f"{server.base_url}/chargewire", timeout=2, context=context
+            ):
                 return
         except (urllib.error.URLError, OSError) as error:
             if "CERTIFICATE_REQUIRED" in str(error):
@@ -97,7 +99,7 @@ def _wait_up(server: Server, timeout: float = 30) -> None:
         time.sleep(0.1)
     stop_server(server=server)
     pytest.fail(
-        reason=f"hardcharger-server did not answer at {server.base_url}/warp "
+        reason=f"hardcharger-server did not answer at {server.base_url}/chargewire "
         f"({last_error}); its log:\n{server.log_tail()}"
     )
 

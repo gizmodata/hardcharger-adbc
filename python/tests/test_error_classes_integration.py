@@ -27,9 +27,9 @@ Status = adbc_driver_manager.AdbcStatusCode
 LONG_QUERY = "SELECT sum(a.range * b.range) FROM range(100000000) a, range(100000) b"
 
 
-def warp_code(error: BaseException) -> str | None:
+def chargewire_code(error: BaseException) -> str | None:
     for key, value in getattr(error, "details", None) or []:
-        if (key.decode() if isinstance(key, bytes) else key) == "warp.code":
+        if (key.decode() if isinstance(key, bytes) else key) == "chargewire.code":
             return value.decode() if isinstance(value, bytes) else value
     return None
 
@@ -57,7 +57,7 @@ def assert_raised(
     assert type(error) is klass, f"{type(error).__name__}, want {klass.__name__}: {error}"
     assert not isinstance(error, hardcharger.InternalError), error
     assert error.status_code == status, error
-    assert warp_code(error=error) == code, error
+    assert chargewire_code(error=error) == code, error
     if sqlstate is not None:
         assert error.sqlstate == sqlstate, error
     if message is not None:

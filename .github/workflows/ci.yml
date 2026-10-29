@@ -10,8 +10,8 @@ name: ci
 #
 # Access, with no personal token, while the pieces this builds on are private (unnecessary once
 # they are public):
-#   - github.com/gizmodata/warp-sql-adbc (a Go module dependency) through the
-#     WARP_SQL_ADBC_DEPLOY_KEY secret, a read-only deploy key of that repository;
+#   - github.com/gizmodata/chargewire-adbc (a Go module dependency) through the
+#     CHARGEWIRE_ADBC_DEPLOY_KEY secret, a read-only deploy key of that repository;
 #   - hardcharger-server from the image ghcr.io/gizmodata/hardcharger, pulled with this
 #     workflow's GITHUB_TOKEN; the package grants this repository read access (package
 #     settings, Manage Actions access).
@@ -55,7 +55,7 @@ jobs:
         run: scripts/sync_python_readme.sh --check
       - uses: ./.github/actions/go-private
         with:
-          deploy-key: ${{ secrets.WARP_SQL_ADBC_DEPLOY_KEY }}
+          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
@@ -121,7 +121,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/readme"
           (cd "$RUNNER_TEMP/readme" && env -i PATH="$PATH" HARDCHARGER_ADMIN_PASSWORD=change-me \
             "$HARDCHARGER_ADBC_TEST_SERVER_BINARY" --print-queries false > server.log 2>&1 &)
-          for _ in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:31337/warp && break; sleep 1; done
+          for _ in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:31337/chargewire && break; sleep 1; done
           python/.venv/bin/python -m adbc_driver_hardcharger.manifest --dir "$RUNNER_TEMP/manifests"
           cc -Wall examples/c/hello.c -I"$RUNNER_TEMP/adbc/include" -L"$RUNNER_TEMP/adbc/lib" \
             -ladbc_driver_manager -Wl,-rpath,"$RUNNER_TEMP/adbc/lib" -o "$RUNNER_TEMP/hello"
@@ -141,7 +141,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/go-private
         with:
-          deploy-key: ${{ secrets.WARP_SQL_ADBC_DEPLOY_KEY }}
+          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod

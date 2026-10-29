@@ -9,27 +9,27 @@ import (
 	"time"
 
 	"github.com/apache/arrow-adbc/go/adbc"
-	"github.com/gizmodata/warp-sql-adbc/go/warpsql"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
-// Browser sign-in (auth_type external) is the Warp SQL protocol's (spec §4.3),
-// on the server's own port: the Warp SQL driver asks the server for a sign-in
+// Browser sign-in (auth_type external) is the Chargewire protocol's (spec §4.3),
+// on the server's own port: the Chargewire driver asks the server for a sign-in
 // flow, the user signs in to the server's identity provider in a browser, and
 // the server hands out its own access token once. The identity provider's
 // settings stay on the server.
 
 // openBrowser is the opener for OptionOAuthBrowser's value (tests replace it).
-var openBrowser = func(command string) warpsql.BrowserOpener { return warpsql.SystemBrowser(command) }
+var openBrowser = func(command string) chargewire.BrowserOpener { return chargewire.SystemBrowser(command) }
 
-// browserSignIn runs a browser sign-in against the server the Warp SQL
-// options name (uri and adbc.warp.tls.*) and returns the server's access
+// browserSignIn runs a browser sign-in against the server the Chargewire
+// options name (uri and adbc.chargewire.tls.*) and returns the server's access
 // token and its lifetime.
-func browserSignIn(ctx context.Context, warpOptions map[string]string, browser string,
+func browserSignIn(ctx context.Context, chargewireOptions map[string]string, browser string,
 	timeout time.Duration) (string, time.Duration, error) {
 	if browser == "" {
 		browser = defaultBrowser()
 	}
-	result, err := warpsql.BrowserSignIn(ctx, warpOptions, openBrowser(browser), timeout)
+	result, err := chargewire.BrowserSignIn(ctx, chargewireOptions, openBrowser(browser), timeout)
 	if err != nil {
 		return "", 0, err
 	}

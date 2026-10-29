@@ -229,13 +229,13 @@ class Connection(_BaseConnection):
 
     @property
     def session_id(self) -> str:
-        """This connection's server session id (``adbc.warp.session.id``), for another
+        """This connection's server session id (``adbc.chargewire.session.id``), for another
         process to attach to with ``connect(session_id=...)``."""
         return self.adbc_connection.get_option(key=ConnectionOptions.SESSION_ID.value)
 
     @property
     def access_token(self) -> str:
-        """The access token this connection sends (``adbc.warp.auth.access_token``): the one
+        """The access token this connection sends (``adbc.chargewire.auth.access_token``): the one
         the driver got by signing in, renewed first when it is about to expire (so after a
         renewal, the new one), or the ``access_token`` given to ``connect()`` as it is.
 
@@ -248,7 +248,7 @@ class Connection(_BaseConnection):
     @property
     def access_token_expires_at(self) -> Optional[datetime.datetime]:
         """When :attr:`access_token` expires (a UTC datetime), or ``None`` when the driver
-        doesn't know (``adbc.warp.auth.access_token_expires_at``)."""
+        doesn't know (``adbc.chargewire.auth.access_token_expires_at``)."""
         text = self.adbc_connection.get_option(key=ConnectionOptions.ACCESS_TOKEN_EXPIRES_AT.value)
         if not text:
             return None
@@ -295,7 +295,7 @@ def connect(
 
     Args:
         uri: ``hardcharger://host[:port][?tls=false]``: HTTPS unless ``?tls=false``, port 31337
-            unless given. ``warp://``, ``https://`` and ``http://`` URIs work too, as does
+            unless given. ``chargewire://``, ``https://`` and ``http://`` URIs work too, as does
             ``profile://<name>``.
         profile: Name (or absolute path) of an ADBC connection profile. Install the
             driver manifest first (``python -m adbc_driver_hardcharger.manifest``); profiles
@@ -311,7 +311,7 @@ def connect(
             ``"client_certificate"``.
         auth_type: ``"password"`` (default); ``"external"``: sign in through a browser with
             the server's identity provider (``hardcharger-server --oauth-client-id``; the
-            server lists the Warp SQL capability ``oauth_browser``); or
+            server lists the Chargewire capability ``oauth_browser``); or
             ``"client_certificate"`` (``"mtls"``): sign in with the TLS client certificate
             (``tls_client_cert`` and ``tls_client_key``) and no password, on a server with
             ``--mtls-ca-cert`` and ``--mtls-certificate-sign-in``. The token is bound to the
@@ -354,7 +354,7 @@ def connect(
             session, open transaction included, to the next.
         catalog: Catalog to make current for the session.
         db_schema: Schema to make current for the session.
-        db_kwargs: Extra ADBC database options (``adbc.hardcharger.*``, ``adbc.warp.*``).
+        db_kwargs: Extra ADBC database options (``adbc.hardcharger.*``, ``adbc.chargewire.*``).
         conn_kwargs: Extra ADBC connection options.
         autocommit: Enable autocommit (default True).
 

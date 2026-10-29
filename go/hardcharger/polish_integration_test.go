@@ -18,7 +18,7 @@ import (
 
 	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/gizmodata/warp-sql-adbc/go/warpsql"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 	"go.uber.org/goleak"
 )
 
@@ -107,7 +107,7 @@ func TestIntegrationTLSToAPlainHTTPServerSaysToTurnTLSOff(t *testing.T) {
 	proxy := newByteRecorder(t, shared.port)
 	uri := fmt.Sprintf("hardcharger://127.0.0.1:%d", proxy.port()) // TLS: the default
 	_, _, err := open(t, shared, map[string]string{adbc.OptionKeyURI: uri})
-	want := fmt.Sprintf("[warpsql] The server at 127.0.0.1:%d speaks plain HTTP, not TLS. "+
+	want := fmt.Sprintf("[chargewire] The server at 127.0.0.1:%d speaks plain HTTP, not TLS. "+
 		"Add ?tls=false to the URI to connect without encryption.", proxy.port())
 	var adbcErr adbc.Error
 	if !errors.As(err, &adbcErr) || adbcErr.Code != adbc.StatusIO || adbcErr.Msg != want {
@@ -144,7 +144,7 @@ func countBrowser(t *testing.T, idp *mockIdP, code string) *atomic.Int64 {
 	browserThatSignsIn(t, idp, code)
 	signIn := openBrowser
 	count := &atomic.Int64{}
-	openBrowser = func(command string) warpsql.BrowserOpener {
+	openBrowser = func(command string) chargewire.BrowserOpener {
 		inner := signIn(command)
 		return func(ctx context.Context, url string) error {
 			count.Add(1)
@@ -287,7 +287,7 @@ func TestIntegrationSharedSignInRenewsBeforeTheTokenExpires(t *testing.T) {
 func sharedEntryOf(t *testing.T, db adbc.DatabaseWithContext) *sharedSignIn {
 	t.Helper()
 	d := db.(*database)
-	return sharedSignInFor(signInKeyFor(d.warpURI, d.warpOptions, d.cfg.signInKey))
+	return sharedSignInFor(signInKeyFor(d.chargewireURI, d.chargewireOptions, d.cfg.signInKey))
 }
 
 // poisonSharedSignIn replaces the shared sign-in of the databases that options

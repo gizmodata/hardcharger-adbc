@@ -31,7 +31,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/memory"
 )
 
-// Client certificate sign-in (Warp SQL §4.4) against hardcharger-server with
+// Client certificate sign-in (Chargewire §4.4) against hardcharger-server with
 // --mtls-ca-cert and --mtls-certificate-sign-in: auth_type=client_certificate.
 
 // certificateAuthority is a throwaway CA, written to PEM files, that issues a
@@ -103,8 +103,8 @@ func (ca *certificateAuthority) mtlsServerArgs(extra ...string) []string {
 // certificateOptions sign in with cert/key alone: no user name or password.
 func certificateOptions(ca *certificateAuthority, cert, key string) map[string]string {
 	return map[string]string{adbc.OptionKeyUsername: "<unset>", adbc.OptionKeyPassword: "<unset>",
-		OptionAuthType: AuthTypeClientCertificate, "adbc.warp.tls.root_certs": ca.caPEM,
-		"adbc.warp.tls.client_cert": cert, "adbc.warp.tls.client_key": key}
+		OptionAuthType: AuthTypeClientCertificate, "adbc.chargewire.tls.root_certs": ca.caPEM,
+		"adbc.chargewire.tls.client_cert": cert, "adbc.chargewire.tls.client_key": key}
 }
 
 const opsIdentity = "OPS@example.com" // configured spelling; the certificate says ops@example.com
@@ -195,8 +195,8 @@ func TestIntegrationClientCertificateUnknownIdentityIsRefused(t *testing.T) {
 	cert, key := ca.issue(t, "stranger@example.com", false)
 	_, _, err := open(t, server, certificateOptions(ca, cert, key))
 	wantStatus(t, err, adbc.StatusUnauthenticated, "stranger@example.com")
-	if code := warpCode(err); code != "unknown_certificate_identity" {
-		t.Fatalf("warp.code %q: %v", code, err)
+	if code := chargewireCode(err); code != "unknown_certificate_identity" {
+		t.Fatalf("chargewire.code %q: %v", code, err)
 	}
 	// The twin, ops@example.com, is TestIntegrationClientCertificateSignIn.
 }
@@ -229,7 +229,7 @@ func certificateToken(t *testing.T, server *testServer, ca *certificateAuthority
 	pool.AppendCertsFromPEM([]byte(ca.caPEM))
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, Certificates: []tls.Certificate{pair}}}}
 	defer client.CloseIdleConnections()
-	resp, err := client.Post("https://127.0.0.1:"+strconv.Itoa(server.port)+"/warp/v1/auth/token", "application/json",
+	resp, err := client.Post("https://127.0.0.1:"+strconv.Itoa(server.port)+"/chargewire/v1/auth/token", "application/json",
 		strings.NewReader(`{"grant_type":"client_certificate"}`))
 	if err != nil {
 		t.Fatal(err)
@@ -253,13 +253,13 @@ func TestIntegrationClientCertificateBoundTokenOverAnotherCertificate(t *testing
 	token := certificateToken(t, server, ca, ops, opsKey)
 	withToken := func(cert, key string) map[string]string {
 		opts := certificateOptions(ca, cert, key)
-		opts[OptionAuthType], opts["adbc.warp.auth.access_token"] = AuthTypePassword, token
+		opts[OptionAuthType], opts["adbc.chargewire.auth.access_token"] = AuthTypePassword, token
 		return opts
 	}
 	_, _, err := open(t, server, withToken(other, otherKey))
 	wantStatus(t, err, adbc.StatusUnauthenticated, "")
-	if code := warpCode(err); code != "certificate_mismatch" {
-		t.Fatalf("warp.code %q: %v", code, err)
+	if code := chargewireCode(err); code != "certificate_mismatch" {
+		t.Fatalf("chargewire.code %q: %v", code, err)
 	}
 	// The twin: the token over its own certificate.
 	if got := scalar(t, mustOpen(t, server, withToken(ops, opsKey)), "SELECT HARDCHARGER_USER()"); got != opsIdentity {

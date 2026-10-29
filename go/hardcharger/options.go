@@ -11,19 +11,19 @@ import (
 	"github.com/apache/arrow-adbc/go/adbc"
 )
 
-// Hardcharger's ADBC options. Every other option is the Warp SQL driver's
-// (adbc.warp.*, uri, username, password, ...).
+// Hardcharger's ADBC options. Every other option is the Chargewire driver's
+// (adbc.chargewire.*, uri, username, password, ...).
 const (
 	optionPrefix = "adbc.hardcharger."
 
 	// OptionAuthType is "password" (the default; also for a pre-issued
 	// access token), "external": sign in through a browser with the server's
-	// identity provider (Warp SQL browser sign-in on the server's own port;
+	// identity provider (Chargewire browser sign-in on the server's own port;
 	// hardcharger-server --oauth-client-id), when the first connection opens, or "client_certificate" ("mtls"): sign in with the
-	// TLS client certificate alone (adbc.warp.tls.client_cert and
-	// adbc.warp.tls.client_key), no password; the server must run with
-	// --mtls-ca-cert and --mtls-certificate-sign-in. It is the Warp SQL
-	// driver's adbc.warp.auth.type, which does the sign-in, under
+	// TLS client certificate alone (adbc.chargewire.tls.client_cert and
+	// adbc.chargewire.tls.client_key), no password; the server must run with
+	// --mtls-ca-cert and --mtls-certificate-sign-in. It is the Chargewire
+	// driver's adbc.chargewire.auth.type, which does the sign-in, under
 	// Hardcharger's name.
 	OptionAuthType            = "adbc.hardcharger.auth_type"
 	AuthTypePassword          = "password"
@@ -31,8 +31,8 @@ const (
 	AuthTypeClientCertificate = "client_certificate"
 	// authTypeMTLS is accepted for client_certificate, as the hardcharger
 	// command-line client's --auth-type mtls.
-	authTypeMTLS = "mtls"
-	warpAuthType = "adbc.warp.auth.type"
+	authTypeMTLS       = "mtls"
+	chargewireAuthType = "adbc.chargewire.auth.type"
 
 	// OptionOAuthTimeoutSeconds is how long to wait for the user to sign in
 	// (default 300).
@@ -68,13 +68,13 @@ const (
 	// (SET SESSION); an empty value resets it. On a connection, GetOption
 	// reads the value that applies to the session.
 	OptionSettingPrefix = "adbc.hardcharger.setting."
-	// OptionIngestParts is the Warp SQL driver's adbc.warp.ingest.parts under
+	// OptionIngestParts is the Chargewire driver's adbc.chargewire.ingest.parts under
 	// Hardcharger's name: the most connections one bulk ingest is sent over at
 	// once (default 8: an upload of two batches or more is a partitioned
 	// ingest; 1: one ordered stream). Database and connection; on a statement,
-	// set adbc.warp.ingest.parts.
-	OptionIngestParts = "adbc.hardcharger.ingest.parts"
-	warpIngestParts   = "adbc.warp.ingest.parts"
+	// set adbc.chargewire.ingest.parts.
+	OptionIngestParts     = "adbc.hardcharger.ingest.parts"
+	chargewireIngestParts = "adbc.chargewire.ingest.parts"
 
 	// OptionGlobalSettingPrefix + NAME sets the server-wide setting
 	// hardcharger.NAME (SET GLOBAL; admins only); an empty value resets it.
@@ -196,10 +196,10 @@ func (c *config) get(key string) (string, error) {
 	return "", adbc.Error{Code: adbc.StatusNotFound, Msg: "[hardcharger] option " + key + " is not set"}
 }
 
-// warpAuthTypeFor is the Warp SQL driver's adbc.warp.auth.type for an
-// auth_type: a browser sign-in here hands the Warp SQL driver the server's
+// chargewireAuthTypeFor is the Chargewire driver's adbc.chargewire.auth.type for an
+// auth_type: a browser sign-in here hands the Chargewire driver the server's
 // access token, which it uses as a token issued elsewhere.
-func warpAuthTypeFor(authType string) string {
+func chargewireAuthTypeFor(authType string) string {
 	if authType == AuthTypeClientCertificate {
 		return AuthTypeClientCertificate
 	}

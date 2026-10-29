@@ -58,7 +58,7 @@ func TestIntegrationSQLErrorsAreNotInternal(t *testing.T) {
 			continue
 		}
 		wantStatus(t, err, tc.status, tc.text)
-		if code := warpCode(err); code != tc.code {
+		if code := chargewireCode(err); code != tc.code {
 			t.Errorf("%s: code %q, want %q", tc.sql, code, tc.code)
 		}
 	}

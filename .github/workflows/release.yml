@@ -10,7 +10,7 @@ name: release
 # workflow_dispatch runs the tests and the builds only: the release and publish jobs need a tag.
 #
 # Each release also carries a go/vX.Y.Z tag on the same commit, for the Go module in go/
-# (go-module.yml; RELEASING.md has the order, warp-sql-adbc first). `v*` does not match it.
+# (go-module.yml; RELEASING.md has the order, chargewire-adbc first). `v*` does not match it.
 
 on:
   push:
@@ -78,7 +78,7 @@ jobs:
 
       - uses: ./.github/actions/go-private
         with:
-          deploy-key: ${{ secrets.WARP_SQL_ADBC_DEPLOY_KEY }}
+          deploy-key: ${{ secrets.CHARGEWIRE_ADBC_DEPLOY_KEY }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod

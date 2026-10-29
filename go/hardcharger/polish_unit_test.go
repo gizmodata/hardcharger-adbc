@@ -16,7 +16,7 @@ import (
 
 	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/gizmodata/warp-sql-adbc/go/warpsql"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
 // --- shared browser sign-in -------------------------------------------------------------------
@@ -124,19 +124,19 @@ func TestSharedSignInWaiterGivesUp(t *testing.T) {
 }
 
 func TestSignInKeys(t *testing.T) {
-	base := signInKeyFor("warp://h:31337", nil, "")
+	base := signInKeyFor("chargewire://h:31337", nil, "")
 	same := []signInKey{
-		signInKeyFor("warp://H:31337/", map[string]string{"adbc.warp.retry.max_attempts": "2"}, ""),
+		signInKeyFor("chargewire://H:31337/", map[string]string{"adbc.chargewire.retry.max_attempts": "2"}, ""),
 	}
 	different := map[string]signInKey{
-		"another server":    signInKeyFor("warp://h:31338", nil, ""),
-		"another host":      signInKeyFor("warp://other:31337", nil, ""),
-		"plain HTTP":        signInKeyFor("warp://h:31337?tls=false", nil, ""),
-		"another base path": signInKeyFor("warp://h:31337/x", nil, ""),
-		"other roots":       signInKeyFor("warp://h:31337", map[string]string{"adbc.warp.tls.root_certs": "pem"}, ""),
-		"skip verify":       signInKeyFor("warp://h:31337", map[string]string{"adbc.warp.tls.skip_verify": "true"}, ""),
-		"server name":       signInKeyFor("warp://h:31337", map[string]string{"adbc.warp.tls.server_name": "x"}, ""),
-		"another key":       signInKeyFor("warp://h:31337", nil, "alice"),
+		"another server":    signInKeyFor("chargewire://h:31338", nil, ""),
+		"another host":      signInKeyFor("chargewire://other:31337", nil, ""),
+		"plain HTTP":        signInKeyFor("chargewire://h:31337?tls=false", nil, ""),
+		"another base path": signInKeyFor("chargewire://h:31337/x", nil, ""),
+		"other roots":       signInKeyFor("chargewire://h:31337", map[string]string{"adbc.chargewire.tls.root_certs": "pem"}, ""),
+		"skip verify":       signInKeyFor("chargewire://h:31337", map[string]string{"adbc.chargewire.tls.skip_verify": "true"}, ""),
+		"server name":       signInKeyFor("chargewire://h:31337", map[string]string{"adbc.chargewire.tls.server_name": "x"}, ""),
+		"another key":       signInKeyFor("chargewire://h:31337", nil, "alice"),
 	}
 	for _, key := range same {
 		if key != base {
@@ -244,7 +244,7 @@ func TestTLSToAPlainHTTPServerSaysToTurnTLSOff(t *testing.T) {
 	}
 	defer db.Close(ctx)
 	_, err = db.Open(ctx)
-	want := fmt.Sprintf("[warpsql] The server at 127.0.0.1:%d speaks plain HTTP, not TLS. "+
+	want := fmt.Sprintf("[chargewire] The server at 127.0.0.1:%d speaks plain HTTP, not TLS. "+
 		"Add ?tls=false to the URI to connect without encryption.", server.port())
 	var adbcErr adbc.Error
 	if !errors.As(err, &adbcErr) || adbcErr.Code != adbc.StatusIO || adbcErr.Msg != want {
@@ -264,7 +264,7 @@ func TestTLSToAPlainHTTPServerSaysToTurnTLSOff(t *testing.T) {
 	}
 }
 
-// Browser sign-in over TLS to a server that speaks plain HTTP: the Warp SQL
+// Browser sign-in over TLS to a server that speaks plain HTTP: the Chargewire
 // driver's hint, before any flow is created or a browser opened.
 func TestBrowserSignInToAPlainHTTPServer(t *testing.T) {
 	server := newPlainHTTPListener(t)
@@ -289,12 +289,12 @@ func TestBrowserSignInToAPlainHTTPServer(t *testing.T) {
 }
 
 func TestARefusedSharedTokenIsReplacedOnlyForRenewableReasons(t *testing.T) {
-	// Warp SQL §4.2: sign in again after no reason, token_expired or an unknown reason;
+	// Chargewire §4.2: sign in again after no reason, token_expired or an unknown reason;
 	// not after token_revoked, credentials_changed or principal_dropped.
 	refusal := func(reason string) adbc.Error {
 		err := adbc.Error{Code: adbc.StatusUnauthenticated, Msg: "refused"}
 		if reason != "" {
-			err.Details = []adbc.ErrorDetail{&adbc.TextErrorDetail{Name: warpsql.ErrorDetailReason, Detail: reason}}
+			err.Details = []adbc.ErrorDetail{&adbc.TextErrorDetail{Name: chargewire.ErrorDetailReason, Detail: reason}}
 		}
 		return err
 	}

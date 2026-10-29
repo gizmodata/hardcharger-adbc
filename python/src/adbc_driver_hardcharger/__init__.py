@@ -1,7 +1,7 @@
 """ADBC driver for Hardcharger, GizmoData's DuckDB 2.0 server.
 
 Python bindings over the native Go driver (``libadbc_driver_hardcharger``), which is built on
-the Warp SQL ADBC driver and adds ``hardcharger://`` URIs with Hardcharger's port 31337, query
+the Chargewire ADBC driver and adds ``hardcharger://`` URIs with Hardcharger's port 31337, query
 and session tags, ``hardcharger.*`` settings and browser sign-in, for every ADBC language.
 
 Quick start::
@@ -20,7 +20,7 @@ from __future__ import annotations
 from ._options import ConnectionOptions, DatabaseOptions, StatementOptions
 from ._version import __version__
 
-#: Hardcharger's Warp SQL port, used when a hardcharger:// URI names none.
+#: Hardcharger's Chargewire port, used when a hardcharger:// URI names none.
 DEFAULT_PORT = 31337
 
 __all__ = [

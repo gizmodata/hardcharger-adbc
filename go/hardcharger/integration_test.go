@@ -37,7 +37,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/gizmodata/warp-sql-adbc/go/warpsql"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
 func insecureTransport() *http.Transport {
@@ -71,16 +71,16 @@ func TestIntegrationGetInfoNamesHardcharger(t *testing.T) {
 func TestIntegrationWrongPasswordIsRefused(t *testing.T) {
 	_, _, err := open(t, shared, map[string]string{adbc.OptionKeyPassword: "not-the-password"})
 	wantStatus(t, err, adbc.StatusUnauthenticated, "the user name or password is not correct")
-	if code := warpCode(err); code != "invalid_credentials" {
-		t.Fatalf("warp.code %q", code)
+	if code := chargewireCode(err); code != "invalid_credentials" {
+		t.Fatalf("chargewire.code %q", code)
 	}
 	// The twin: the right password.
 	mustOpen(t, shared, nil)
 }
 
-func TestIntegrationWarpURIWorksToo(t *testing.T) {
+func TestIntegrationChargewireURIWorksToo(t *testing.T) {
 	cnxn := mustOpen(t, shared, map[string]string{
-		adbc.OptionKeyURI: "warp://127.0.0.1:" + strconv.Itoa(shared.port) + "?tls=false"})
+		adbc.OptionKeyURI: "chargewire://127.0.0.1:" + strconv.Itoa(shared.port) + "?tls=false"})
 	if got := scalar(t, cnxn, "SELECT 1"); got != "1" {
 		t.Fatal(got)
 	}
@@ -146,8 +146,8 @@ func TestIntegrationInvalidSettingValueIsRefused(t *testing.T) {
 	opts := mustOpen(t, shared, nil).(adbc.GetSetOptionsWithContext)
 	err := opts.SetOption(ctx, OptionSettingPrefix+"query_timeout", "soon")
 	wantStatus(t, err, adbc.StatusInvalidArgument, "Invalid value for query_timeout: 'soon' is not a whole number")
-	if code := warpCode(err); code != "sql_error" {
-		t.Fatalf("warp.code %q", code)
+	if code := chargewireCode(err); code != "sql_error" {
+		t.Fatalf("chargewire.code %q", code)
 	}
 	// The twin.
 	if err := opts.SetOption(ctx, OptionSettingPrefix+"query_timeout", "45"); err != nil {
@@ -271,7 +271,7 @@ func TestIntegrationTLSIsTheDefaultAndVerifies(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "certificate") {
 		t.Fatalf("an untrusted certificate: %v", err)
 	}
-	cnxn := mustOpen(t, server, map[string]string{"adbc.warp.tls.root_certs": string(caPEM)})
+	cnxn := mustOpen(t, server, map[string]string{"adbc.chargewire.tls.root_certs": string(caPEM)})
 	if got := scalar(t, cnxn, "SELECT 1"); got != "1" {
 		t.Fatal(got)
 	}
@@ -395,7 +395,7 @@ func browserThatSignsIn(t *testing.T, idp *mockIdP, code string) {
 	idp.issue = code
 	idp.mu.Unlock()
 	saved := openBrowser
-	openBrowser = func(string) warpsql.BrowserOpener {
+	openBrowser = func(string) chargewire.BrowserOpener {
 		return func(ctx context.Context, authURL string) error {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, authURL, nil)
 			if err != nil {
@@ -453,7 +453,7 @@ func TestIntegrationBrowserSignInForAnUnauthorizedUser(t *testing.T) {
 func TestIntegrationBrowserSignInNeedsTheServersCapability(t *testing.T) {
 	opened := false
 	saved := openBrowser
-	openBrowser = func(string) warpsql.BrowserOpener {
+	openBrowser = func(string) chargewire.BrowserOpener {
 		return func(context.Context, string) error { opened = true; return nil }
 	}
 	t.Cleanup(func() { openBrowser = saved })

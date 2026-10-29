@@ -23,29 +23,29 @@ import (
 
 	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/gizmodata/warp-sql-adbc/go/warpsql"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
-func TestToWarpURI(t *testing.T) {
+func TestToChargewireURI(t *testing.T) {
 	for raw, want := range map[string]string{
-		"hardcharger://db.example.com":            "warp://db.example.com:31337",
-		"hardcharger://db.example.com:443":        "warp://db.example.com:443",
-		"hardcharger://127.0.0.1?tls=false":       "warp://127.0.0.1:31337?tls=false",
-		"hardcharger://127.0.0.1:4000?tls=false":  "warp://127.0.0.1:4000?tls=false",
-		"hardcharger://h/custom/base":             "warp://h:31337/custom/base",
-		"HARDCHARGER://h":                         "warp://h:31337",
-		"hardcharger://[::1]":                     "warp://[::1]:31337",
-		"hardcharger://[::1]:5000?tls=false":      "warp://[::1]:5000?tls=false",
-		"warp://h:1?tls=false":                    "warp://h:1?tls=false",
-		"https://h/warp":                          "https://h/warp",
+		"hardcharger://db.example.com":            "chargewire://db.example.com:31337",
+		"hardcharger://db.example.com:443":        "chargewire://db.example.com:443",
+		"hardcharger://127.0.0.1?tls=false":       "chargewire://127.0.0.1:31337?tls=false",
+		"hardcharger://127.0.0.1:4000?tls=false":  "chargewire://127.0.0.1:4000?tls=false",
+		"hardcharger://h/custom/base":             "chargewire://h:31337/custom/base",
+		"HARDCHARGER://h":                         "chargewire://h:31337",
+		"hardcharger://[::1]":                     "chargewire://[::1]:31337",
+		"hardcharger://[::1]:5000?tls=false":      "chargewire://[::1]:5000?tls=false",
+		"chargewire://h:1?tls=false":              "chargewire://h:1?tls=false",
+		"https://h/chargewire":                    "https://h/chargewire",
 		"http://h:8080":                           "http://h:8080",
-		"grpc://h:1":                              "grpc://h:1", // the Warp SQL driver refuses it
-		"hardcharger://joe@h:1":                   "warp://joe@h:1",
-		"hardcharger://h:1?tls=false&extra=thing": "warp://h:1?tls=false&extra=thing",
+		"grpc://h:1":                              "grpc://h:1", // the Chargewire driver refuses it
+		"hardcharger://joe@h:1":                   "chargewire://joe@h:1",
+		"hardcharger://h:1?tls=false&extra=thing": "chargewire://h:1?tls=false&extra=thing",
 	} {
-		got, err := ToWarpURI(raw)
+		got, err := ToChargewireURI(raw)
 		if err != nil || got != want {
-			t.Errorf("ToWarpURI(%q) = %q, %v; want %q", raw, got, err, want)
+			t.Errorf("ToChargewireURI(%q) = %q, %v; want %q", raw, got, err, want)
 		}
 	}
 }
@@ -62,21 +62,21 @@ func wantStatus(t *testing.T, err error, status adbc.Status, text string) {
 }
 
 func TestPlusHTTPSchemeIsRefusedWithTheSpellingToUse(t *testing.T) {
-	_, err := ToWarpURI("hardcharger+http://127.0.0.1:31337")
+	_, err := ToChargewireURI("hardcharger+http://127.0.0.1:31337")
 	wantStatus(t, err, adbc.StatusInvalidArgument, "hardcharger://host:port?tls=false for plain HTTP")
 	// The twin: the plain-HTTP spelling.
-	got, err := ToWarpURI("hardcharger://127.0.0.1:31337?tls=false")
-	if err != nil || got != "warp://127.0.0.1:31337?tls=false" || usesTLS(got) {
+	got, err := ToChargewireURI("hardcharger://127.0.0.1:31337?tls=false")
+	if err != nil || got != "chargewire://127.0.0.1:31337?tls=false" || usesTLS(got) {
 		t.Fatalf("got %q, %v", got, err)
 	}
 }
 
 func TestBadURIs(t *testing.T) {
-	_, err := ToWarpURI("")
+	_, err := ToChargewireURI("")
 	wantStatus(t, err, adbc.StatusInvalidArgument, "a uri is required")
-	_, err = ToWarpURI("hardcharger:///base")
+	_, err = ToChargewireURI("hardcharger:///base")
 	wantStatus(t, err, adbc.StatusInvalidArgument, "no host")
-	_, err = ToWarpURI("hardcharger://joe:secret@h:bad")
+	_, err = ToChargewireURI("hardcharger://joe:secret@h:bad")
 	wantStatus(t, err, adbc.StatusInvalidArgument, "invalid uri")
 	if strings.Contains(err.Error(), "secret") {
 		t.Fatalf("the password leaked: %v", err)
@@ -85,8 +85,8 @@ func TestBadURIs(t *testing.T) {
 
 func TestUsesTLS(t *testing.T) {
 	for uri, want := range map[string]bool{
-		"warp://h:1": true, "warp://h:1?tls=false": false, "warp://h:1?tls=0": false,
-		"warp://h:1?tls=true": true, "https://h": true, "http://h": false,
+		"chargewire://h:1": true, "chargewire://h:1?tls=false": false, "chargewire://h:1?tls=0": false,
+		"chargewire://h:1?tls=true": true, "https://h": true, "http://h": false,
 	} {
 		if got := usesTLS(uri); got != want {
 			t.Errorf("usesTLS(%q) = %v", uri, got)
@@ -159,9 +159,9 @@ func TestDatabaseOptions(t *testing.T) {
 			t.Errorf("GetOption(%s) = %q, %v; want %q", key, got, err, want)
 		}
 	}
-	// The Warp SQL driver got the translated URI and none of Hardcharger's options.
-	if db.warpURI != "warp://h:31337?tls=false" {
-		t.Errorf("warp uri %q", db.warpURI)
+	// The Chargewire driver got the translated URI and none of Hardcharger's options.
+	if db.chargewireURI != "chargewire://h:31337?tls=false" {
+		t.Errorf("chargewire uri %q", db.chargewireURI)
 	}
 	_, err = db.GetOption(ctx, OptionSessionTag)
 	wantStatus(t, err, adbc.StatusNotFound, "is not set")
@@ -194,8 +194,8 @@ func TestSetOptionAfterCreation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if db.warpURI != "warp://h2:31337" {
-		t.Fatalf("warp uri %q", db.warpURI)
+	if db.chargewireURI != "chargewire://h2:31337" {
+		t.Fatalf("chargewire uri %q", db.chargewireURI)
 	}
 	if got, _ := db.GetOption(ctx, adbc.OptionKeyURI); got != "hardcharger://h2" {
 		t.Fatalf("uri %q", got)
@@ -207,24 +207,24 @@ func TestSetOptionAfterCreation(t *testing.T) {
 		t.Fatalf("query tag %q", got)
 	}
 	wantStatus(t, db.SetOption(ctx, OptionAuthType, "nope"), adbc.StatusInvalidArgument, "expected password, external or client_certificate (mtls)")
-	// The Warp SQL driver's options reach it after creation too (driverbase's
+	// The Chargewire driver's options reach it after creation too (driverbase's
 	// SetOptions refused them as unknown), and it validates them.
-	if err := db.SetOption(ctx, "adbc.warp.retry.max_attempts", "3"); err != nil {
+	if err := db.SetOption(ctx, "adbc.chargewire.retry.max_attempts", "3"); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := db.GetOption(ctx, "adbc.warp.retry.max_attempts"); got != "3" {
+	if got, _ := db.GetOption(ctx, "adbc.chargewire.retry.max_attempts"); got != "3" {
 		t.Fatalf("max attempts %q", got)
 	}
-	if err := db.SetOptions(ctx, map[string]string{OptionIngestParts: "2", "adbc.warp.tls.skip_verify": "true"}); err != nil {
+	if err := db.SetOptions(ctx, map[string]string{OptionIngestParts: "2", "adbc.chargewire.tls.skip_verify": "true"}); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := db.GetOption(ctx, "adbc.warp.tls.skip_verify"); got != "true" {
+	if got, _ := db.GetOption(ctx, "adbc.chargewire.tls.skip_verify"); got != "true" {
 		t.Fatalf("skip verify %q", got)
 	}
-	wantStatus(t, db.SetOption(ctx, "adbc.warp.retry.max_attempts", "zero"), adbc.StatusInvalidArgument, "adbc.warp.retry.max_attempts")
+	wantStatus(t, db.SetOption(ctx, "adbc.chargewire.retry.max_attempts", "zero"), adbc.StatusInvalidArgument, "adbc.chargewire.retry.max_attempts")
 }
 
-// fakeSignIn is a Warp SQL server with browser sign-in (spec §4.3): discovery,
+// fakeSignIn is a Chargewire server with browser sign-in (spec §4.3): discovery,
 // a flow, and polls answered from the queued answers (a pending flow after
 // them). A poll without the flow's secret gets 404 flow_not_found.
 type fakeSignIn struct {
@@ -259,18 +259,18 @@ func newFakeSignIn(t *testing.T, polls ...fakeAnswer) *fakeSignIn {
 			_ = json.NewEncoder(w).Encode(body)
 		}
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/warp":
+		case r.Method == http.MethodGet && r.URL.Path == "/chargewire":
 			capabilities := []string{}
 			if f.offer {
 				capabilities = append(capabilities, "oauth_browser")
 			}
-			reply(200, map[string]any{"protocol": "warp-sql", "protocol_versions": []string{"1"},
+			reply(200, map[string]any{"protocol": "chargewire", "protocol_versions": []string{"1"},
 				"server": map[string]string{"name": "Hardcharger", "version": "0"}, "capabilities": capabilities,
 				"auth": map[string]any{"grant_types": []string{"password"}, "oauth_browser": map[string]string{}}})
-		case r.Method == http.MethodPost && r.URL.Path == "/warp/v1/auth/oauth/flows":
+		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/auth/oauth/flows":
 			reply(201, map[string]any{"flow_id": "f_1", "poll_secret": fakePollSecret,
 				"authorize_url": "http://idp/authorize?state=s", "poll_interval_s": 1, "expires_at": "2099-01-01T00:00:00Z"})
-		case r.Method == http.MethodPost && r.URL.Path == "/warp/v1/auth/oauth/flows/f_1":
+		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/auth/oauth/flows/f_1":
 			var body map[string]string
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			f.secrets = append(f.secrets, body["poll_secret"])
@@ -281,7 +281,7 @@ func newFakeSignIn(t *testing.T, polls ...fakeAnswer) *fakeSignIn {
 				answer, f.polls = f.polls[0], f.polls[1:]
 			}
 			reply(answer.status, answer.body)
-		case r.Method == http.MethodPost && r.URL.Path == "/warp/v1/sessions":
+		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/sessions":
 			f.sessions = append(f.sessions, r.Header.Get("Authorization"))
 			reply(201, map[string]any{"session_id": "s1", "options": map[string]any{}})
 		case r.Method == http.MethodDelete:
@@ -298,7 +298,7 @@ func newFakeSignIn(t *testing.T, polls ...fakeAnswer) *fakeSignIn {
 func withBrowser(t *testing.T, fn func(command, url string) error) {
 	t.Helper()
 	saved := openBrowser
-	openBrowser = func(command string) warpsql.BrowserOpener {
+	openBrowser = func(command string) chargewire.BrowserOpener {
 		return func(_ context.Context, url string) error { return fn(command, url) }
 	}
 	t.Cleanup(func() { openBrowser = saved })
@@ -337,7 +337,7 @@ func TestBrowserSignInCompletesAfterPending(t *testing.T) {
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
 	if got := strings.Join(fake.requests[:4], ", "); got !=
-		"GET /warp, POST /warp/v1/auth/oauth/flows, POST /warp/v1/auth/oauth/flows/f_1, POST /warp/v1/auth/oauth/flows/f_1" {
+		"GET /chargewire, POST /chargewire/v1/auth/oauth/flows, POST /chargewire/v1/auth/oauth/flows/f_1, POST /chargewire/v1/auth/oauth/flows/f_1" {
 		t.Fatalf("requests %q", fake.requests)
 	}
 	for _, secret := range fake.secrets {
@@ -416,8 +416,8 @@ func TestBrowserNoneOnlyPrintsTheURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = cnxn.Close(context.Background())
-	// "none" reaches the Warp SQL driver's opener, which prints the URL instead.
-	if len(commands) != 1 || commands[0] != warpsql.BrowserNone {
+	// "none" reaches the Chargewire driver's opener, which prints the URL instead.
+	if len(commands) != 1 || commands[0] != chargewire.BrowserNone {
 		t.Fatalf("commands %q", commands)
 	}
 }
@@ -450,21 +450,21 @@ func TestSideSignInServerOptionsAreGone(t *testing.T) {
 	}
 }
 
-func TestIngestPartsIsTheWarpOption(t *testing.T) {
+func TestIngestPartsIsTheChargewireOption(t *testing.T) {
 	ctx := context.Background()
 	db, err := newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionIngestParts: "2"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{OptionIngestParts, warpIngestParts} {
+	for _, key := range []string{OptionIngestParts, chargewireIngestParts} {
 		if got, err := db.GetOption(ctx, key); err != nil || got != "2" {
 			t.Errorf("GetOption(%s) = %q, %v", key, got, err)
 		}
 	}
-	// The Warp SQL driver validates it, under either name; the twin is above.
+	// The Chargewire driver validates it, under either name; the twin is above.
 	_, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionIngestParts: "none"})
-	wantStatus(t, err, adbc.StatusInvalidArgument, warpIngestParts)
-	// Unset, it is the Warp SQL driver's default: auto (16 parts on a near link, 32 on a far one).
+	wantStatus(t, err, adbc.StatusInvalidArgument, chargewireIngestParts)
+	// Unset, it is the Chargewire driver's default: auto (16 parts on a near link, 32 on a far one).
 	db, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h"})
 	if err != nil {
 		t.Fatal(err)
@@ -472,7 +472,7 @@ func TestIngestPartsIsTheWarpOption(t *testing.T) {
 	if got, err := db.GetOption(ctx, OptionIngestParts); err != nil || got != "auto" {
 		t.Errorf("default ingest parts %q, %v", got, err)
 	}
-	if got, err := db.GetOption(ctx, "adbc.warp.statement.result_partitions"); err != nil || got != "32" {
+	if got, err := db.GetOption(ctx, "adbc.chargewire.statement.result_partitions"); err != nil || got != "32" {
 		t.Errorf("default result partitions %q, %v", got, err)
 	}
 }
@@ -497,15 +497,15 @@ func selfSignedPEM(t *testing.T) (certPEM, keyPEM string) {
 		string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
 }
 
-// auth_type=client_certificate is the Warp SQL driver's adbc.warp.auth.type:
-// the Warp SQL driver's own checks run on it (they need a certificate, TLS
+// auth_type=client_certificate is the Chargewire driver's adbc.chargewire.auth.type:
+// the Chargewire driver's own checks run on it (they need a certificate, TLS
 // and no password), so a refusal from it proves the option reached it.
-func TestClientCertificateAuthTypeIsTheWarpOption(t *testing.T) {
+func TestClientCertificateAuthTypeIsTheChargewireOption(t *testing.T) {
 	ctx := context.Background()
 	cert, key := selfSignedPEM(t)
 	withCertificate := func(extra map[string]string) map[string]string {
 		opts := map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionAuthType: AuthTypeClientCertificate,
-			"adbc.warp.tls.client_cert": cert, "adbc.warp.tls.client_key": key}
+			"adbc.chargewire.tls.client_cert": cert, "adbc.chargewire.tls.client_key": key}
 		for k, v := range extra {
 			if v == "<unset>" {
 				delete(opts, k)
@@ -519,8 +519,8 @@ func TestClientCertificateAuthTypeIsTheWarpOption(t *testing.T) {
 		opts map[string]string
 		text string
 	}{
-		"no certificate": {withCertificate(map[string]string{"adbc.warp.tls.client_cert": "<unset>",
-			"adbc.warp.tls.client_key": "<unset>"}), "needs a client certificate: set adbc.warp.tls.client_cert and adbc.warp.tls.client_key"},
+		"no certificate": {withCertificate(map[string]string{"adbc.chargewire.tls.client_cert": "<unset>",
+			"adbc.chargewire.tls.client_key": "<unset>"}), "needs a client certificate: set adbc.chargewire.tls.client_cert and adbc.chargewire.tls.client_key"},
 		"a password beside it": {withCertificate(map[string]string{adbc.OptionKeyUsername: "joe", adbc.OptionKeyPassword: "pw"}),
 			"signs in with the client certificate alone; do not also set username, password"},
 		"plain HTTP": {withCertificate(map[string]string{adbc.OptionKeyURI: "hardcharger://h?tls=false"}), "needs TLS"},
@@ -538,13 +538,13 @@ func TestClientCertificateAuthTypeIsTheWarpOption(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", spelling, err)
 		}
-		for _, k := range []string{OptionAuthType, warpAuthType} {
+		for _, k := range []string{OptionAuthType, chargewireAuthType} {
 			if got, err := db.GetOption(ctx, k); err != nil || got != AuthTypeClientCertificate {
 				t.Errorf("%s: GetOption(%s) = %q, %v", spelling, k, got, err)
 			}
 		}
 	}
-	// Back to a password: the Warp SQL driver is told too.
+	// Back to a password: the Chargewire driver is told too.
 	db, err := newDB(t, withCertificate(nil))
 	if err != nil {
 		t.Fatal(err)
@@ -552,7 +552,7 @@ func TestClientCertificateAuthTypeIsTheWarpOption(t *testing.T) {
 	if err := db.SetOption(ctx, OptionAuthType, AuthTypePassword); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := db.GetOption(ctx, warpAuthType); got != AuthTypePassword {
-		t.Errorf("warp auth type %q after auth_type=password", got)
+	if got, _ := db.GetOption(ctx, chargewireAuthType); got != AuthTypePassword {
+		t.Errorf("chargewire auth type %q after auth_type=password", got)
 	}
 }

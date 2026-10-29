@@ -7,30 +7,30 @@ test gate, the shared library for every platform, the wheels, the GitHub Release
 convention applies; `go-module.yml` checks the pair and warms the module proxy). The Python
 package and the Go module share one version line, the server's (2.0.0 with Hardcharger 2.0.0).
 
-The Go module depends on `github.com/gizmodata/warp-sql-adbc/go`, so the generic driver is
+The Go module depends on `github.com/gizmodata/chargewire-adbc/go/v2`, so the generic driver is
 released first.
 
 ## Order
 
-1. **warp-sql-adbc first**: its `vX.Y.Z` and `go/vX.Y.Z` tags are pushed and its workflows are
+1. **chargewire-adbc first**: its `vX.Y.Z` and `go/vX.Y.Z` tags are pushed and its workflows are
    green (its `RELEASING.md`), and the module proxy serves the version:
 
    ```bash
-   GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go list -m github.com/gizmodata/warp-sql-adbc/go@vX.Y.Z
+   GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go list -m github.com/gizmodata/chargewire-adbc/go/v2@vX.Y.Z
    ```
 
 2. **Move `go/go.mod` from the pseudo-version to that release**, on `main`:
 
    ```bash
    cd go
-   go get github.com/gizmodata/warp-sql-adbc/go@vX.Y.Z
+   go get github.com/gizmodata/chargewire-adbc/go/v2@vX.Y.Z
    go mod tidy
    cd ..
-   scripts/third_party_notices.sh        # its warp-sql-adbc entry names the version; CI checks the file
+   scripts/third_party_notices.sh        # its chargewire-adbc entry names the version; CI checks the file
    (cd go && make test)
    ```
 
-   Commit it ("Build on warp-sql-adbc/go vX.Y.Z"), with a CHANGELOG line, push `main`, and wait
+   Commit it ("Build on chargewire-adbc/go/v2 vX.Y.Z"), with a CHANGELOG line, push `main`, and wait
    for CI (the Go unit and live suites, the Python bindings, the notices check).
 3. The version in `python/src/adbc_driver_hardcharger/_version.py` and `CHANGELOG.md`'s
    `## [X.Y.Z] - YYYY-MM-DD` section with today's date, on `main`, green.
@@ -46,7 +46,7 @@ released first.
 
    `release.yml` runs on `vX.Y.Z` (its `v*` trigger does not match `go/v*`); `go-module.yml` runs
    on `go/vX.Y.Z`, and refuses a commit that `vX.Y.Z` is not on or whose `go.mod` still names a
-   pseudo-version of warp-sql-adbc.
+   pseudo-version of chargewire-adbc.
 5. Wait for both workflows, then check what was published:
 
    ```bash
@@ -57,11 +57,11 @@ released first.
 
 ## While the repositories are internal
 
-`go/go.mod` keeps the pseudo-version of warp-sql-adbc (`v0.0.0-<date>-<sha>`, fetched over SSH
-with the `WARP_SQL_ADBC_DEPLOY_KEY` deploy key and `GOPRIVATE=github.com/gizmodata/*`,
-`.github/actions/go-private`) until warp-sql-adbc's `go/vX.Y.Z` tag exists and is public:
+`go/go.mod` keeps the pseudo-version of chargewire-adbc (`v0.0.0-<date>-<sha>`, fetched over SSH
+with the `CHARGEWIRE_ADBC_DEPLOY_KEY` deploy key and `GOPRIVATE=github.com/gizmodata/*`,
+`.github/actions/go-private`) until chargewire-adbc's `go/vX.Y.Z` tag exists and is public:
 `proxy.golang.org` cannot read an internal repository, and the released version does not exist
 before the tag. `go-module.yml` refuses a pseudo-version, so a `go/vX.Y.Z` tag of this module
 cannot be pushed before step 2. Once both repositories are public, remove
 `.github/actions/go-private`, its uses in `ci.yml`, `release.yml` and `go-module.yml`, the
-`WARP_SQL_ADBC_DEPLOY_KEY` secret and the `GOPRIVATE` notes in the README.
+`CHARGEWIRE_ADBC_DEPLOY_KEY` secret and the `GOPRIVATE` notes in the README.

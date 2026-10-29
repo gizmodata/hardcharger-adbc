@@ -21,10 +21,10 @@ from conftest import USERNAME, make_certificates, start_server, stop_server
 pytestmark = pytest.mark.integration
 
 
-def warp_code(error: Exception) -> str | None:
-    """The Warp SQL error code the driver put in the error's details."""
+def chargewire_code(error: Exception) -> str | None:
+    """The Chargewire error code the driver put in the error's details."""
     for key, value in getattr(error, "details", None) or []:
-        if (key.decode() if isinstance(key, bytes) else key) == "warp.code":
+        if (key.decode() if isinstance(key, bytes) else key) == "chargewire.code":
             return value.decode() if isinstance(value, bytes) else value
     return None
 
@@ -103,7 +103,7 @@ def test_connection_helpers(conn):
     assert re.fullmatch(r"v?\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?", conn.server_version()), (
         conn.server_version()
     )
-    # The session's own id (the Warp SQL one, s_..., from Hardcharger 0.4.0; a UUID before).
+    # The session's own id (the Chargewire one, s_..., from Hardcharger 0.4.0; a UUID before).
     assert re.fullmatch(r"s_[a-z2-7]{32}|[0-9a-f-]{36}", conn.current_session()), (
         conn.current_session()
     )
@@ -112,7 +112,7 @@ def test_connection_helpers(conn):
 def test_wrong_password_is_refused(hc_server):
     with pytest.raises(expected_exception=adbc_driver_manager.ProgrammingError) as error:
         hardcharger.connect(uri=hc_server.uri, username=USERNAME, password="not-the-password")
-    assert warp_code(error=error.value) == "invalid_credentials"
+    assert chargewire_code(error=error.value) == "invalid_credentials"
     assert "the user name or password is not correct" in str(error.value)
 
 
@@ -123,8 +123,8 @@ def test_right_password_twin(hc_server):
         assert conn.current_user() == USERNAME
 
 
-def test_warp_uri_works_too(hc_server):
-    uri = f"warp://{hc_server.host}:{hc_server.port}?tls=false"
+def test_chargewire_uri_works_too(hc_server):
+    uri = f"chargewire://{hc_server.host}:{hc_server.port}?tls=false"
     with hardcharger.connect(uri=uri, username=USERNAME, password=hc_server.password) as conn:
         assert isinstance(conn, hardcharger.Connection)
         assert conn.current_user() == USERNAME
@@ -386,7 +386,7 @@ def test_subject_token_from_another_issuer_is_refused(exchange_server):
     with pytest.raises(expected_exception=adbc_driver_manager.Error) as error:
         hardcharger.connect(uri=exchange_server.uri, subject_token=token)
     assert error.value.status_code == adbc_driver_manager.AdbcStatusCode.UNAUTHENTICATED
-    assert warp_code(error=error.value) == "invalid_credentials"
+    assert chargewire_code(error=error.value) == "invalid_credentials"
     assert "the sign-in token is not accepted" in str(error.value)
 
 
@@ -399,7 +399,7 @@ def access_token(server, username: str = USERNAME, password: str | None = None) 
     import urllib.request
 
     request = urllib.request.Request(
-        url=f"{server.base_url}/warp/v1/auth/token",
+        url=f"{server.base_url}/chargewire/v1/auth/token",
         data=json.dumps(
             obj={
                 "grant_type": "password",
@@ -447,9 +447,9 @@ def test_a_transaction_moves_to_another_process(hc_server):
             uri=hc_server.uri, access_token=token, session_id=session_id
         ) as attached:
             assert attached.session_id == session_id
-            assert attached.adbc_connection.get_option(key="adbc.warp.session.transaction") == (
-                "open"
-            )
+            assert attached.adbc_connection.get_option(
+                key="adbc.chargewire.session.transaction"
+            ) == ("open")
             assert _count(conn=attached, sql="SELECT count(*) FROM handoff") == 1
             with attached.cursor() as cur:
                 cur.execute(operation="COMMIT")
@@ -489,7 +489,7 @@ def test_attaching_to_a_missing_session_is_session_not_found(hc_server):
         password=hc_server.password,
     )
     assert error.status_code == adbc_driver_manager.AdbcStatusCode.NOT_FOUND
-    assert warp_code(error=error) == "session_not_found"
+    assert chargewire_code(error=error) == "session_not_found"
     assert "attaching to session s_does_not_exist" in str(error)
 
 
@@ -498,23 +498,25 @@ def test_close_session_on_release(hc_server):
     # A created session ends when its connection closes...
     with hardcharger.connect(uri=hc_server.uri, **credentials) as conn:
         created = conn.session_id
-        assert conn.adbc_connection.get_option(key="adbc.warp.session.close_on_release") == ("true")
+        assert conn.adbc_connection.get_option(key="adbc.chargewire.session.close_on_release") == (
+            "true"
+        )
     error = _attach_error(server=hc_server, session_id=created, **credentials)
-    assert warp_code(error=error) == "session_not_found"
+    assert chargewire_code(error=error) == "session_not_found"
     # ... unless told otherwise; an attached one stays when its connection closes...
     with hardcharger.connect(uri=hc_server.uri, close_session_on_release=False, **credentials) as c:
         kept = c.session_id
     for _ in range(2):
         with hardcharger.connect(uri=hc_server.uri, session_id=kept, **credentials) as attached:
             assert attached.adbc_connection.get_option(
-                key="adbc.warp.session.close_on_release"
+                key="adbc.chargewire.session.close_on_release"
             ) == ("false")
             assert attached.session_id == kept
     # ... until a connection that may end it closes.
     with hardcharger.connect(uri=hc_server.uri, session_id=kept, **credentials) as attached:
-        attached.adbc_connection.set_options(**{"adbc.warp.session.close_on_release": "true"})
+        attached.adbc_connection.set_options(**{"adbc.chargewire.session.close_on_release": "true"})
     error = _attach_error(server=hc_server, session_id=kept, **credentials)
-    assert warp_code(error=error) == "session_not_found"
+    assert chargewire_code(error=error) == "session_not_found"
 
 
 def _bearer_status(server, token: str, session_id: str) -> int:
@@ -523,7 +525,7 @@ def _bearer_status(server, token: str, session_id: str) -> int:
     import urllib.request
 
     request = urllib.request.Request(
-        url=f"{server.base_url}/warp/v1/sessions/{session_id}",
+        url=f"{server.base_url}/chargewire/v1/sessions/{session_id}",
         headers={"Authorization": f"Bearer {token}"},
     )
     try:
@@ -565,7 +567,7 @@ def test_the_access_token_is_readable_and_works(lifetime_server):
         )
         left = expires_at - datetime.datetime.now(tz=datetime.timezone.utc)
         assert datetime.timedelta(seconds=590) < left <= datetime.timedelta(seconds=601), left
-        text = conn.adbc_connection.get_option(key="adbc.warp.auth.access_token_expires_at")
+        text = conn.adbc_connection.get_option(key="adbc.chargewire.auth.access_token_expires_at")
         assert text.endswith("Z") and datetime.datetime.fromisoformat(text) == expires_at
 
 
@@ -652,7 +654,7 @@ def test_another_users_session_is_refused(rbac_server):
     )
     # The server answers another user's session as it answers a missing one (§9.2).
     assert error.status_code == adbc_driver_manager.AdbcStatusCode.NOT_FOUND
-    assert warp_code(error=error) == "session_not_found"
+    assert chargewire_code(error=error) == "session_not_found"
     # The twin: the session's own user attaches.
     with hardcharger.connect(
         uri=rbac_server.uri,
@@ -751,7 +753,7 @@ def test_client_certificate_unknown_identity_is_refused(mtls_server, mtls_certs)
     with pytest.raises(expected_exception=adbc_driver_manager.Error) as error:
         _certificate_connect(server=mtls_server, certs=mtls_certs, client="stranger")
     assert error.value.status_code == adbc_driver_manager.AdbcStatusCode.UNAUTHENTICATED
-    assert warp_code(error=error.value) == "unknown_certificate_identity"
+    assert chargewire_code(error=error.value) == "unknown_certificate_identity"
     assert "stranger@example.com" in str(error.value)
 
 
@@ -804,7 +806,7 @@ def test_no_client_certificate_is_certificate_required(mtls_server, mtls_certs):
             tls_root_certs=mtls_certs["ca"],
         )
     assert error.value.status_code == adbc_driver_manager.AdbcStatusCode.UNAUTHENTICATED
-    assert warp_code(error=error.value) == "certificate_required"
+    assert chargewire_code(error=error.value) == "certificate_required"
 
 
 # --- sessions ------------------------------------------------------------------------------
@@ -840,7 +842,7 @@ def test_invalid_setting_value_is_refused(conn):
     with pytest.raises(expected_exception=adbc_driver_manager.ProgrammingError) as error:
         conn.set_setting(name="query_timeout", value="soon")
     assert "Invalid value for query_timeout: 'soon' is not a whole number" in str(error.value)
-    assert warp_code(error=error.value) == "sql_error"
+    assert chargewire_code(error=error.value) == "sql_error"
 
 
 def test_valid_setting_value_twin(conn):
@@ -1284,7 +1286,7 @@ def test_a_prepared_settings_query_re_executes_with_new_parameters(conn):
             assert cur.fetchall() == [(want,)], name
 
 
-# --- defaults inherited from the Warp SQL driver: split results and partitioned uploads ---------
+# --- defaults inherited from the Chargewire driver: split results and partitioned uploads ---------
 
 LARGE_RESULT = "SELECT i, i * 2 AS j FROM range(2000000) t(i)"
 
@@ -1300,7 +1302,7 @@ def test_one_result_partition_when_asked(hc_server):
         uri=hc_server.uri,
         username=USERNAME,
         password=hc_server.password,
-        db_kwargs={"adbc.warp.statement.result_partitions": "1"},
+        db_kwargs={"adbc.chargewire.statement.result_partitions": "1"},
     ) as conn:
         with conn.cursor() as cur:
             partitions, _ = cur.adbc_execute_partitions(operation=LARGE_RESULT)
@@ -1377,9 +1379,9 @@ def test_one_ingest_part_when_asked_by_hardcharger_name(proxied):
     assert ingest_requests() == (1, 0, 0)
 
 
-def test_ingest_parts_by_warp_name_and_on_a_connection(proxied):
+def test_ingest_parts_by_chargewire_name_and_on_a_connection(proxied):
     connect, ingest_requests = proxied
-    with connect(db_kwargs={"adbc.warp.ingest.parts": "2"}) as conn:
+    with connect(db_kwargs={"adbc.chargewire.ingest.parts": "2"}) as conn:
         ingest_16_batches(conn=conn, table="py_two_parts")
     assert ingest_requests() == (0, 1, 2)
     with connect() as conn:

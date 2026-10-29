@@ -15,18 +15,18 @@ import (
 
 const (
 	// Scheme is Hardcharger's URI scheme: hardcharger://host[:port] means
-	// exactly warp://host:port (HTTPS unless ?tls=false).
+	// exactly chargewire://host:port (HTTPS unless ?tls=false).
 	Scheme = "hardcharger"
-	// DefaultPort is Hardcharger's Warp SQL port, used when a hardcharger://
-	// URI names none (warp:// would default to 443).
+	// DefaultPort is Hardcharger's Chargewire port, used when a hardcharger://
+	// URI names none (chargewire:// would default to 443).
 	DefaultPort = 31337
 )
 
-// ToWarpURI translates a hardcharger:// URI into the warp:// URI the Warp SQL
+// ToChargewireURI translates a hardcharger:// URI into the chargewire:// URI the Chargewire
 // driver reads, adding the default port 31337 when the URI has none.
-// warp://, https:// and http:// URIs pass through unchanged; the Warp SQL
+// chargewire://, https:// and http:// URIs pass through unchanged; the Chargewire
 // driver validates everything else (parameters, credentials in the URI).
-func ToWarpURI(raw string) (string, error) {
+func ToChargewireURI(raw string) (string, error) {
 	if raw == "" {
 		return "", invalidArgument("a uri is required, e.g. hardcharger://host:31337")
 	}
@@ -46,7 +46,7 @@ func ToWarpURI(raw string) (string, error) {
 		return "", invalidArgument("%s:// is not a Hardcharger URI scheme: use hardcharger://host:port for HTTPS, "+
 			"or hardcharger://host:port?tls=false for plain HTTP", u.Scheme)
 	default:
-		return raw, nil // warp://, https://, http://, or something the Warp SQL driver refuses
+		return raw, nil // chargewire://, https://, http://, or something the Chargewire driver refuses
 	}
 	if u.Hostname() == "" {
 		return "", invalidArgument("invalid uri %q: no host", u.Redacted())
@@ -54,20 +54,20 @@ func ToWarpURI(raw string) (string, error) {
 	if u.Port() == "" {
 		u.Host = net.JoinHostPort(u.Hostname(), strconv.Itoa(DefaultPort))
 	}
-	u.Scheme = "warp"
+	u.Scheme = "chargewire"
 	return u.String(), nil
 }
 
-// usesTLS reports whether a (translated) Warp SQL URI connects over TLS.
-func usesTLS(warpURI string) bool {
-	u, err := url.Parse(warpURI)
+// usesTLS reports whether a (translated) Chargewire URI connects over TLS.
+func usesTLS(chargewireURI string) bool {
+	u, err := url.Parse(chargewireURI)
 	if err != nil {
 		return true
 	}
 	switch strings.ToLower(u.Scheme) {
 	case "http":
 		return false
-	case "warp":
+	case "chargewire":
 		switch strings.ToLower(strings.TrimSpace(u.Query().Get("tls"))) {
 		case "false", "0", "f", "no", "off":
 			return false
