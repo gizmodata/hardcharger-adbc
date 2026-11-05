@@ -238,6 +238,29 @@ class TestConnectOptions:
         hardcharger.connect(uri="hardcharger://h")
         assert "adbc.chargewire.session.close_on_release" not in _db_kwargs(mock_db=mock_db)
 
+    def test_resume_timeout(self, mock_db, mock_conn, mock_cls):
+        hardcharger.connect(uri="hardcharger://h", access_token="tok", resume_timeout=90)
+        assert _db_kwargs(mock_db=mock_db)["adbc.hardcharger.resume_timeout"] == "90"
+        hardcharger.connect(uri="hardcharger://h", resume_timeout=0)
+        assert _db_kwargs(mock_db=mock_db)["adbc.hardcharger.resume_timeout"] == "0"
+        hardcharger.connect(uri="hardcharger://h", resume_timeout=2.5)
+        assert _db_kwargs(mock_db=mock_db)["adbc.hardcharger.resume_timeout"] == "2.5"
+        hardcharger.connect(uri="hardcharger://h")
+        assert "adbc.hardcharger.resume_timeout" not in _db_kwargs(mock_db=mock_db)
+
+    def test_resume_timeout_refusals(self, mock_db, mock_conn, mock_cls):
+        with pytest.raises(expected_exception=TypeError, match="resume_timeout must be a number"):
+            hardcharger.connect(uri="hardcharger://h", resume_timeout="soon")
+        with pytest.raises(expected_exception=TypeError, match="resume_timeout must be a number"):
+            hardcharger.connect(uri="hardcharger://h", resume_timeout=True)
+        with pytest.raises(expected_exception=ValueError, match="disagree"):
+            hardcharger.connect(
+                uri="hardcharger://h",
+                resume_timeout=5,
+                db_kwargs={"adbc.hardcharger.resume_timeout": "6"},
+            )
+        mock_db.assert_not_called()
+
     @pytest.mark.parametrize(
         argnames=("kwargs", "error", "text"),
         argvalues=[
@@ -399,6 +422,15 @@ class TestLibrary:
             **{"adbc.chargewire.tls.server_name": "hc-1.gizmodata.test"},
         ) as db:
             assert db.get_option(key="adbc.chargewire.tls.server_name") == "hc-1.gizmodata.test"
+
+    def test_resume_timeout_is_the_chargewire_option(self):
+        with adbc_driver_manager.AdbcDatabase(
+            driver=_driver_path(),
+            uri="hardcharger://127.0.0.1",
+            **{"adbc.hardcharger.resume_timeout": "45"},
+        ) as db:
+            assert db.get_option(key="adbc.hardcharger.resume_timeout") == "45"
+            assert db.get_option(key="adbc.chargewire.resume_timeout") == "45"
 
     def test_session_options_reach_the_chargewire_driver(self):
         with adbc_driver_manager.AdbcDatabase(

@@ -47,8 +47,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.2.0, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
-> Chargewire 2.1.0), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.1.0;
+> **Status: 2.3.0, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.1.0), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.0;
 > tested against `hardcharger-server` 2.7.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |
@@ -142,12 +142,13 @@ driver refuses `hardcharger+http://` with a message naming `?tls=false`.
 
 Every option of the [Chargewire driver](https://github.com/gizmodata/chargewire-adbc#%EF%B8%8F-options)
 (`adbc.chargewire.*`: TLS, tokens, retries, compression, ...) applies, with its defaults. Two shape
-throughput, and the driver keeps the Chargewire driver's defaults:
+throughput and one waits for a resuming server; the driver keeps the Chargewire driver's defaults:
 
 | Option | Default | Meaning |
 |---|---|---|
 | `adbc.chargewire.statement.result_partitions` | 32 | A large result is split into up to this many partitions, read at once over their own connections (the server decides; a result of fewer than two batches is one stream). `1`: never split |
 | `adbc.chargewire.ingest.parts` (also `adbc.hardcharger.ingest.parts`) | `auto` | A bulk ingest of two batches or more goes over up to this many connections, committed as one. Its rows land in no defined order; `1`: one stream, in the upload's order |
+| `adbc.chargewire.resume_timeout` (also `adbc.hardcharger.resume_timeout`; Python `resume_timeout=`) | 600 | Seconds to keep sending a request again while the server answers `server_resuming`: a stopped GizmoData Cloud cluster starting again because a client connected. Each repeat waits the answer's `Retry-After` (at least 1 s, at most 60 s; 3 s without one), the sign-in included; then the error is `server_resuming` (`StatusIO`). `0`: fail at once. Database only |
 
 Hardcharger's own:
 
@@ -158,6 +159,7 @@ Hardcharger's own:
 | `adbc.hardcharger.setting.NAME` | database, connection | `SET SESSION hardcharger.NAME`: on every new session (database) or now (connection; `""` resets, and GetOption reads the value that applies) |
 | `adbc.hardcharger.global_setting.NAME` | connection | `SET GLOBAL hardcharger.NAME` (admins); `""` resets |
 | `adbc.hardcharger.ingest.parts` | database, connection | `adbc.chargewire.ingest.parts` under Hardcharger's name (on a statement, use the Chargewire name) |
+| `adbc.hardcharger.resume_timeout` | database | `adbc.chargewire.resume_timeout` under Hardcharger's name (see above) |
 | `adbc.hardcharger.auth_type` | database | `password` (default), `external` (browser sign-in), or `client_certificate` (also `mtls`): sign in with the client certificate alone; it is the Chargewire driver's `adbc.chargewire.auth.type` |
 | `adbc.hardcharger.oauth.timeout_seconds` | database | How long to wait for the sign-in (default 300) |
 | `adbc.hardcharger.oauth.browser` | database | Command that opens the sign-in page (the URL is appended); default `$HARDCHARGER_BROWSER`, else the system's; `none` prints the URL |
@@ -187,9 +189,16 @@ sessions) is replaced by a new one, as the [Chargewire driver](https://github.co
 describes. When a transaction was, or may have been, open in it, whether begun with autocommit off
 or with SQL `BEGIN`, the statement that finds it gone fails with the transaction named as lost and
 is not run again in the new session, where autocommit would commit it on its own; the next
-statement runs in the new session. The new session has the connection's Chargewire options, but
-not the `adbc.hardcharger.setting.*` settings or tags, which are set in SQL when a connection
-opens: open a new connection to get them back.
+statement runs in the new session. The new session has the connection's Chargewire options and
+its `adbc.hardcharger.setting.*` settings and tags: the driver sets them in every session it
+opens for the connection, the first and each replacement, before anything else runs there (even
+when the statement that found the old session gone is then refused because its transaction was
+lost). They are the database's, as the connection changed them since with its own options
+(`SetOption`, or Python's `set_setting()`, `set_query_tag()`, ...); what SQL `SET` changed is not
+carried over, nor are `global_setting.*` changes, which live on the server. When setting up the
+new session fails, the driver ends it rather than use it with the server's defaults: the request
+that found the old session gone fails (`StatusIO`, Python `OperationalError`) with the setting
+and the server's reason, and the connection's next request opens and sets up another session.
 
 ## 🐍 Python helpers
 
@@ -505,7 +514,7 @@ packaging/           the driver manifest template
 ## 🛠️ Building and testing
 
 Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.11+. The Chargewire
-driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.1.0
+driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.2.0
 in `go/go.mod`.
 
 ```bash
@@ -521,7 +530,9 @@ make -C go integration-test                # Go live suite (race detector)
 The live suites start real `hardcharger-server` processes on free loopback ports (plain HTTP,
 TLS, instrumentation, browser sign-in against a mock identity provider; the defaults: a large
 result arrives in several partitions and an ingest goes in several parts, counted through a
-recording proxy) and, in Python, load
+recording proxy; sessions replaced after an idle eviction, an idle transaction, a lost transaction
+and `token_expired`, each checked for its settings and tags, the last and a failed setup answered by
+a proxy in front of the real server; a resuming server, answered by the same proxy) and, in Python, load
 the library by manifest through the driver manager. Without a server binary they fail, never
 skip, and a Go run in which no live test ran fails too. CI also builds the ADBC C driver
 manager and runs the C and Go examples against a server on the default port. CI's server is

@@ -894,6 +894,42 @@ def test_connect_applies_settings(hc_server):
         assert conn.get_setting(name="bypass_queue") == "true"
 
 
+def test_settings_and_tags_survive_a_replaced_session(hc_server):
+    """A session the server loses is replaced, and the replacement gets the connection's
+    settings and tags (as changed since it connected) before anything runs in it."""
+    import urllib.request
+
+    with hardcharger.connect(
+        uri=hc_server.uri,
+        username=USERNAME,
+        password=hc_server.password,
+        settings={"query_timeout": 12, "idle_in_transaction_session_timeout": 30},
+        session_tag={"app": "replay"},
+        query_tag={"job": "connect"},
+    ) as conn:
+        conn.set_query_tag(tag={"job": "later"})
+        old = conn.session_id
+        # End the session from outside, as an idle eviction does: the server then answers
+        # session_not_found, and the driver opens a replacement.
+        request = urllib.request.Request(
+            url=f"{hc_server.base_url}/chargewire/v1/sessions/{old}",
+            method="DELETE",
+            headers={"Authorization": f"Bearer {conn.access_token}"},
+        )
+        with urllib.request.urlopen(url=request, timeout=10) as response:
+            assert response.status == 204
+        with conn.cursor() as cur:
+            cur.execute(operation="SELECT 41 + 1")
+            assert cur.fetchone()[0] == 42
+        assert conn.session_id != old
+        replacements = conn.adbc_connection.get_option(key="adbc.chargewire.session.replacements")
+        assert replacements == "1"
+        assert conn.get_setting(name="query_timeout") == "12"
+        assert conn.get_setting(name="idle_in_transaction_session_timeout") == "30"
+        assert json.loads(conn.get_setting(name="query_tag")) == {"job": "later"}
+        assert json.loads(conn.get_setting(name="session_tag")) == {"app": "replay"}
+
+
 def test_connect_with_a_bad_setting_fails_and_leaves_no_session(hc_server):
     def sessions() -> int:
         with hardcharger.connect(

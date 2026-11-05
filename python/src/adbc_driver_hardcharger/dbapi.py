@@ -276,6 +276,7 @@ def connect(
     oauth_timeout: Optional[float] = None,
     open_browser: Union[bool, str] = True,
     share_sign_in: Union[bool, str] = False,
+    resume_timeout: Optional[float] = None,
     session_tag: Optional[Tag] = None,
     query_tag: Optional[Tag] = None,
     settings: Optional[Mapping[str, SettingValue]] = None,
@@ -330,6 +331,10 @@ def connect(
             string shares under that name, for a process that signs in as more than one person
             or role: only connections with the same name share. The token stays in this
             process's memory and never goes to another server.
+        resume_timeout: Seconds to keep sending a request again while the server answers that
+            it is resuming (a stopped GizmoData Cloud cluster starting again because this
+            client connected), each time after the server's ``Retry-After``: default 600,
+            ``0`` fails at once with ``server_resuming``.
         session_tag: A JSON object tagging the session (``hardcharger.session_tag``).
         query_tag: A JSON object tagging the session's statements (``hardcharger.query_tag``).
         settings: ``hardcharger.<name>`` session settings to apply, e.g.
@@ -449,6 +454,16 @@ def connect(
         put(key=options.OAUTH_SHARE_SIGN_IN.value, value="true")
         if isinstance(share_sign_in, str):
             put(key=options.OAUTH_SIGN_IN_KEY.value, value=share_sign_in)
+    if resume_timeout is not None:
+        if isinstance(resume_timeout, bool) or not isinstance(resume_timeout, (int, float)):
+            raise TypeError(
+                f"resume_timeout must be a number of seconds, not {type(resume_timeout).__name__}"
+            )
+        put_only(
+            key=options.RESUME_TIMEOUT.value,
+            value=str(resume_timeout),
+            name="resume_timeout",
+        )
     if session_tag is not None:
         put(key=options.SESSION_TAG.value, value=_tag_text(tag=session_tag))
     if query_tag is not None:

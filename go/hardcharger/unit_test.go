@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -554,5 +555,59 @@ func TestClientCertificateAuthTypeIsTheChargewireOption(t *testing.T) {
 	}
 	if got, _ := db.GetOption(ctx, chargewireAuthType); got != AuthTypePassword {
 		t.Errorf("chargewire auth type %q after auth_type=password", got)
+	}
+}
+
+func TestResumeTimeoutIsTheChargewireOption(t *testing.T) {
+	ctx := context.Background()
+	db, err := newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionResumeTimeout: "45"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{OptionResumeTimeout, chargewireResumeTimeout} {
+		if got, err := db.GetOption(ctx, key); err != nil || got != "45" {
+			t.Errorf("GetOption(%s) = %q, %v", key, got, err)
+		}
+	}
+	// The Chargewire driver validates it, under either name; the twin is above.
+	_, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionResumeTimeout: "soon"})
+	wantStatus(t, err, adbc.StatusInvalidArgument, chargewireResumeTimeout)
+	// Unset, it is the Chargewire driver's default, 600 s.
+	db, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.GetOption(ctx, OptionResumeTimeout); err != nil || got != "600" {
+		t.Errorf("default resume timeout %q, %v", got, err)
+	}
+}
+
+// The setup a replacement session gets: the database's tags and settings, then
+// what the connection set since (a later value of a setting replaces the
+// earlier one in place; "" resets), in a stable order.
+func TestSessionSetupStatements(t *testing.T) {
+	cfg := newConfig()
+	for _, kv := range [][2]string{{OptionSettingPrefix + "query_timeout", "12"}, {OptionQueryTag, `{"a":1}`},
+		{OptionSettingPrefix + "bypass_queue", "true"}, {OptionSettingPrefix + "query_timeout", "13"}} {
+		if err := cfg.set(kv[0], kv[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setup := newSessionSetup(cfg)
+	setup.record("query_tag", `{"a":2}`)
+	setup.record("bypass_queue", "")
+	setup.record("memory_limit_per_query", "1GB")
+	var got []string
+	for _, s := range setup.statements() {
+		got = append(got, setStatement(s.name, s.value, false))
+	}
+	want := []string{
+		`SET SESSION hardcharger.query_tag = '{"a":2}'`,
+		"SET SESSION hardcharger.query_timeout = '13'",
+		"RESET SESSION hardcharger.bypass_queue",
+		"SET SESSION hardcharger.memory_limit_per_query = '1GB'",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("statements\n%q\nwant\n%q", got, want)
 	}
 }
