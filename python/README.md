@@ -47,9 +47,9 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.1.0, compatible with Hardcharger 2.3.0.** Speaks the Chargewire protocol 1.0.0, built on
-> [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.0.0; tested against
-> `hardcharger-server` 2.3.0, and 2.2.0 for servers from before the rename.
+> **Status: 2.2.0, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.1.0), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.1.0;
+> tested against `hardcharger-server` 2.7.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |
 |---|---|
@@ -179,6 +179,17 @@ without a problem document, such as a proxy's page). `chargewire.reason` and `ch
 say why a token or session stopped working or a statement was cancelled (`token_revoked`,
 `killed`, ...). After `token_revoked`, `credentials_changed` or `principal_dropped` the driver
 does not sign in again on its own.
+
+A session the server loses (idle eviction, a restart) or ends for idling in a transaction
+(`session_ended`, reason `idle_in_transaction`: Hardcharger's `idle_in_transaction_session_timeout`,
+which `adbc.hardcharger.setting.idle_in_transaction_session_timeout` sets for the connection's
+sessions) is replaced by a new one, as the [Chargewire driver](https://github.com/gizmodata/chargewire-adbc#%EF%B8%8F-options)
+describes. When a transaction was, or may have been, open in it, whether begun with autocommit off
+or with SQL `BEGIN`, the statement that finds it gone fails with the transaction named as lost and
+is not run again in the new session, where autocommit would commit it on its own; the next
+statement runs in the new session. The new session has the connection's Chargewire options, but
+not the `adbc.hardcharger.setting.*` settings or tags, which are set in SQL when a connection
+opens: open a new connection to get them back.
 
 ## 🐍 Python helpers
 
@@ -494,7 +505,7 @@ packaging/           the driver manifest template
 ## 🛠️ Building and testing
 
 Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.11+. The Chargewire
-driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.0.0
+driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.1.0
 in `go/go.mod`.
 
 ```bash
