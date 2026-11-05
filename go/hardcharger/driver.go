@@ -7,7 +7,8 @@
 // retries, TLS and token sign-in. This package adds:
 //
 //   - hardcharger://host[:port] URIs, meaning exactly chargewire:// (HTTPS unless
-//     ?tls=false), with Hardcharger's port 31337 as the default;
+//     ?tls=false), with Hardcharger's port 31337 as the default, and 443 for a
+//     GizmoData Cloud host (gizmodata.com or a name under it);
 //
 //   - "ADBC Hardcharger Driver - Go" as the driver name in GetInfo (the
 //     vendor name, "Hardcharger", comes from the server);
@@ -287,7 +288,10 @@ func (c *connection) SetOption(ctx context.Context, key, value string) error {
 	if name == "" {
 		return c.Connection.SetOption(ctx, key, value)
 	}
-	if err := c.exec(ctx, setStatement(name, value, global)); err != nil {
+	// The new-session hook sets a session setting up again in every session
+	// that replaces this one (and a global one outlives the session), so the
+	// statement doesn't keep a request from running again on a replacement.
+	if err := c.exec(chargewire.WithSessionStateRestored(ctx), setStatement(name, value, global)); err != nil {
 		return err
 	}
 	if !global {

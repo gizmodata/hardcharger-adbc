@@ -109,6 +109,36 @@ func TestIntegrationSettingsSurviveAnIdleEviction(t *testing.T) {
 	assertSetUp(t, cnxn, old, "30")
 }
 
+// The connection's settings don't keep a request from running again (above),
+// because the driver sets them up in every new session; a setting made in SQL
+// through a statement does, since the new session wouldn't have it: the
+// request fails, saying so, and runs nowhere.
+func TestIntegrationSQLSettingIsNotRunAgain(t *testing.T) {
+	cnxn := mustOpen(t, shared, setupOptions("30"))
+	laterTag(t, cnxn)
+	if err := tryUpdate(t, cnxn, "CREATE OR REPLACE TABLE hc_sql_setting (v INTEGER)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tryUpdate(t, cnxn, "SET SESSION hardcharger.query_timeout = '5'"); err != nil {
+		t.Fatal(err)
+	}
+	endSession(t, shared, connectionOption(t, cnxn, sessionIDOption))
+	err := tryUpdate(t, cnxn, "INSERT INTO hc_sql_setting VALUES (1)")
+	wantStatus(t, err, adbc.StatusIO, "settings and USE")
+	other := mustOpen(t, shared, nil)
+	if got := scalar(t, other, "SELECT count(*) FROM hc_sql_setting"); got != "0" {
+		t.Fatalf("%s rows: the INSERT ran again in the new session, without the SQL setting", got)
+	}
+	if got := connectionOption(t, cnxn, replacementsOption); got != "1" {
+		t.Fatalf("%s replacements, want 1", got)
+	}
+	// The next statement runs in the new session, which has the connection's
+	// settings but not the one made in SQL.
+	if got := scalar(t, cnxn, "SELECT CAST(value AS VARCHAR) FROM hardcharger_settings() WHERE name = 'hardcharger.query_timeout'"); got != "12" {
+		t.Fatalf("hardcharger.query_timeout = %s in the new session, want the connection's 12", got)
+	}
+}
+
 // session_ended with idle_in_transaction, the limit being the session's own
 // setting: the statement that finds the session ended is refused (its
 // transaction was rolled back), and the replacement is set up all the same.
@@ -159,7 +189,7 @@ func TestIntegrationSettingsSurviveTokenExpired(t *testing.T) {
 	cnxn := mustOpenThrough(t, proxy, setupOptions("30"))
 	laterTag(t, cnxn)
 	old := connectionOption(t, cnxn, sessionIDOption)
-	proxy.endOnce(old, "session_ended", "token_expired")
+	proxy.endSessionFor(old, "session_ended", "token_expired")
 	if got := scalar(t, cnxn, "SELECT 41 + 1"); got != "42" {
 		t.Fatalf("SELECT 41 + 1 = %s", got)
 	}
@@ -226,8 +256,9 @@ func endSession(t *testing.T, server *testServer, id string) {
 	}
 }
 
-// sessionProxy forwards to a server and can answer for it: end a session once
-// (a problem for the next request naming it), or refuse one setup statement.
+// sessionProxy forwards to a server and can answer for it: end a session (a
+// problem for every later request naming it, as a server answers for a
+// session it ended), or refuse one setup statement.
 type sessionProxy struct {
 	server *httptest.Server
 	mu     sync.Mutex
@@ -256,7 +287,12 @@ func newSessionProxy(t *testing.T, target *testServer) *sessionProxy {
 	return p
 }
 
-func (p *sessionProxy) endOnce(id, code, reason string) {
+// endSessionFor answers every later request naming session id with the
+// problem code and reason. Not only the next one: the driver frees a finished
+// statement in the background (DELETE .../statements/{id}), and a free that
+// arrives after this call would take a one-time answer, leaving the request
+// the test sends next to reach the session as if it were never ended.
+func (p *sessionProxy) endSessionFor(id, code, reason string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.end[id] = [2]string{code, reason}
@@ -294,7 +330,6 @@ func (p *sessionProxy) intercept(w http.ResponseWriter, r *http.Request) bool {
 	}
 	id, _, _ := strings.Cut(rest, "/")
 	if ended, ok := p.end[id]; ok {
-		delete(p.end, id)
 		problem(w, http.StatusUnauthorized, ended[0], ended[1])
 		return true
 	}
