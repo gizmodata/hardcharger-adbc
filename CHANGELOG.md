@@ -6,6 +6,37 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-05
+
+For Hardcharger 2.7.0 (Chargewire 2.1.0).
+
+### Changed
+
+- Built on the Chargewire ADBC driver 2.1.0 (`github.com/gizmodata/chargewire-adbc/go/v2` v2.1.0),
+  which brings:
+  - **No statement runs again after its transaction was lost.** A session lost (idle eviction, a
+    restart) while a transaction begun with SQL `BEGIN` was open was replaced and the statement
+    that found it gone ran again in the new session, in autocommit, committing it on its own after
+    the transaction's earlier statements had been rolled back (prepared statements too). It now
+    fails with the transaction named as lost, and the next statement runs in the new session.
+    Metadata and option calls that found such a session lost now fail too, instead of running
+    again quietly and hiding the loss.
+  - **`idle_in_transaction`** (Hardcharger 2.7.0's `idle_in_transaction_session_timeout`): a
+    session the server ended for idling in a transaction is replaced, and the statement that found
+    it ended fails rather than run again; before, the connection stayed on the ended session and
+    every later call failed.
+  - Nested schemas (Hardcharger 2.7.0, `CREATE SCHEMA sales.payroll`) appear in GetObjects as
+    `sales.payroll`, and GetTableSchema finds their tables.
+- The README says that a replacement session lacks the connection's `adbc.hardcharger.setting.*`
+  settings and tags (set in SQL when a connection opens).
+
+### Added
+
+- A live test: a session Hardcharger ends for idling in a transaction
+  (`adbc.hardcharger.setting.idle_in_transaction_session_timeout`) is replaced, the statement that
+  found it ended fails with `session_ended` and is not run again, and the connection works
+  afterwards.
+
 ## [2.1.0] - 2026-10-29
 
 ### Changed
