@@ -110,6 +110,8 @@ func (db *database) take(opts map[string]string) (map[string]string, error) {
 		switch {
 		case key == OptionIngestParts:
 			chargewireOpts[chargewireIngestParts] = value
+		case key == OptionResumeTimeout:
+			chargewireOpts[chargewireResumeTimeout] = value
 		case key == OptionAuthType:
 			if err := db.cfg.set(key, value); err != nil {
 				return nil, err
@@ -160,6 +162,8 @@ func (db *database) GetOption(ctx context.Context, key string) (string, error) {
 	switch {
 	case key == OptionIngestParts:
 		return db.Database.GetOption(ctx, chargewireIngestParts)
+	case key == OptionResumeTimeout:
+		return db.Database.GetOption(ctx, chargewireResumeTimeout)
 	case isHardchargerOption(key):
 		return db.cfg.get(key)
 	case key == adbc.OptionKeyURI && db.uri != "":
@@ -169,32 +173,41 @@ func (db *database) GetOption(ctx context.Context, key string) (string, error) {
 }
 
 // Open signs in through the browser first when auth_type is external, then
-// opens a Chargewire connection and applies the session's tags and settings.
+// opens a Chargewire connection whose every session (the first, and each one
+// that replaces a lost session) gets the database's tags and settings before
+// anything else runs in it.
 func (db *database) Open(ctx context.Context) (adbc.ConnectionWithContext, error) {
 	if err := db.signIn(ctx); err != nil {
 		return nil, err
 	}
-	inner, err := db.Database.Open(ctx)
+	db.mu.Lock()
+	setup := newSessionSetup(db.cfg)
+	db.mu.Unlock()
+	hooked := chargewire.WithNewSessionHook(ctx, setup.apply)
+	inner, err := db.Database.Open(hooked)
 	if err != nil && db.refusedSharedToken(err) {
 		// The server refused a shared token it had not seen from this database
 		// (revoked, or the server restarted with other keys): sign in afresh, once.
 		if err = db.signIn(ctx); err != nil {
 			return nil, err
 		}
-		inner, err = db.Database.Open(ctx)
+		inner, err = db.Database.Open(hooked)
 	}
 	if err != nil {
 		return nil, err
 	}
-	cnxn := &connection{Connection: inner.(driverbase.Connection)}
 	db.mu.Lock()
 	db.shared, db.sharedToken = nil, "" // the server took it: this database is signed in for good
-	cfg := *db.cfg
-	cfg.settings = append([]setting(nil), db.cfg.settings...)
 	db.mu.Unlock()
-	if err := cnxn.applyDefaults(ctx, &cfg); err != nil {
-		_ = inner.Close(ctx)
-		return nil, err
+	cnxn := &connection{Connection: inner.(driverbase.Connection), setup: setup}
+	if !setup.applied.Load() {
+		// A session the connection attached to (adbc.chargewire.session.id): the
+		// driver didn't create it, so its hook didn't run. It gets the
+		// database's tags and settings now, as before; it is never replaced.
+		if _, err := setup.run(ctx, cnxn.exec); err != nil {
+			_ = inner.Close(ctx)
+			return nil, err
+		}
 	}
 	return cnxn, nil
 }
@@ -259,26 +272,8 @@ func (db *database) refusedSharedToken(err error) bool {
 // connection wraps the Chargewire connection.
 type connection struct {
 	driverbase.Connection
-}
-
-// applyDefaults runs the database's tags and settings on a new session.
-func (c *connection) applyDefaults(ctx context.Context, cfg *config) error {
-	if cfg.sessionTag != nil {
-		if err := c.exec(ctx, setStatement("session_tag", *cfg.sessionTag, false)); err != nil {
-			return err
-		}
-	}
-	if cfg.queryTag != nil {
-		if err := c.exec(ctx, setStatement("query_tag", *cfg.queryTag, false)); err != nil {
-			return err
-		}
-	}
-	for _, s := range cfg.settings {
-		if err := c.exec(ctx, setStatement(s.name, s.value, false)); err != nil {
-			return err
-		}
-	}
-	return nil
+	// setup is what every session of the connection gets (sessionSetup).
+	setup *sessionSetup
 }
 
 func (c *connection) SetOption(ctx context.Context, key, value string) error {
@@ -292,7 +287,14 @@ func (c *connection) SetOption(ctx context.Context, key, value string) error {
 	if name == "" {
 		return c.Connection.SetOption(ctx, key, value)
 	}
-	return c.exec(ctx, setStatement(name, value, global))
+	if err := c.exec(ctx, setStatement(name, value, global)); err != nil {
+		return err
+	}
+	if !global {
+		// A session that replaces this one gets it too.
+		c.setup.record(name, value)
+	}
+	return nil
 }
 
 func (c *connection) GetOption(ctx context.Context, key string) (string, error) {

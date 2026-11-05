@@ -32,6 +32,11 @@ class DatabaseOptions(enum.Enum):
     #: The most connections one bulk ingest is sent over at once (default 8; 1: one ordered
     #: stream): ``adbc.chargewire.ingest.parts`` under Hardcharger's name. Also a connection option.
     INGEST_PARTS = "adbc.hardcharger.ingest.parts"
+    #: Seconds to keep sending a request again while the server answers ``server_resuming``
+    #: (a stopped GizmoData Cloud cluster starting again because you connected), each time
+    #: after its ``Retry-After``: "600" (the default); "0" fails at once.
+    #: ``adbc.chargewire.resume_timeout`` under Hardcharger's name. Database only.
+    RESUME_TIMEOUT = "adbc.hardcharger.resume_timeout"
 
     #: Do not verify the server's TLS certificate (development only).
     TLS_SKIP_VERIFY = "adbc.chargewire.tls.skip_verify"

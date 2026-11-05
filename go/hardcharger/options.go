@@ -76,6 +76,15 @@ const (
 	OptionIngestParts     = "adbc.hardcharger.ingest.parts"
 	chargewireIngestParts = "adbc.chargewire.ingest.parts"
 
+	// OptionResumeTimeout is the Chargewire driver's adbc.chargewire.resume_timeout
+	// under Hardcharger's name: how long, in seconds, the driver keeps sending a
+	// request again while the server answers server_resuming (a stopped
+	// GizmoData Cloud cluster starting again because a client connected), each
+	// time after the answer's Retry-After. Default 600; 0: don't wait. Database
+	// only.
+	OptionResumeTimeout     = "adbc.hardcharger.resume_timeout"
+	chargewireResumeTimeout = "adbc.chargewire.resume_timeout"
+
 	// OptionGlobalSettingPrefix + NAME sets the server-wide setting
 	// hardcharger.NAME (SET GLOBAL; admins only); an empty value resets it.
 	// Connections only.
