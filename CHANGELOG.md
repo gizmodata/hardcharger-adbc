@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-05
+
+For Hardcharger 2.7.0 (Chargewire 2.1.0), on chargewire-adbc 2.2.0.
+
+### Fixed
+
+- **A replacement session gets the connection's settings and tags.** When the server lost a
+  session (an idle eviction, `session_ended` with `token_expired` or `idle_in_transaction`), the
+  session that replaced it had none of the `adbc.hardcharger.setting.*` settings or the session
+  and query tags, which are set in SQL: `query_timeout` went from 12 to 0, and a session's own
+  `idle_in_transaction_session_timeout` fell back to the server's. The driver now sets them up in
+  every session it opens for a connection, the first and each replacement, before anything else
+  runs there, through the Chargewire driver's new-session hook; a statement refused because its
+  transaction was lost with the old session still leaves the new one set up. They are the
+  database's options as the connection changed them since (`SetOption`, Python's
+  `set_setting()`, `set_query_tag()`, ...). When setting up a replacement fails, the driver ends
+  it instead of using it with the server's defaults: the request that found the loss fails with
+  the setting and the server's reason (`StatusIO`), and the next request tries again with another
+  session. The README's "open a new connection to get them back" limitation is gone.
+
+### Changed
+
+- Built on the Chargewire ADBC driver 2.2.0 (`github.com/gizmodata/chargewire-adbc/go/v2` v2.2.0),
+  for its new-session hook and its waiting for a resuming server (`server_resuming`).
+
+### Added
+
+- `adbc.hardcharger.resume_timeout` (Python `connect(resume_timeout=...)`,
+  `DatabaseOptions.RESUME_TIMEOUT`): the Chargewire driver's new `adbc.chargewire.resume_timeout`
+  under Hardcharger's name. While a stopped GizmoData Cloud cluster starts again because a client
+  connected, its address answers `server_resuming` (503 with `Retry-After`); the driver waits and
+  sends the same request again, the sign-in included, for up to this many seconds (default 600;
+  `0`: fail at once).
+
 ## [2.2.0] - 2026-11-05
 
 For Hardcharger 2.7.0 (Chargewire 2.1.0).
