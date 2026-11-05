@@ -8,7 +8,7 @@ from unittest.mock import patch
 import adbc_driver_manager
 import pytest
 
-from adbc_driver_hardcharger import DEFAULT_PORT, manifest
+from adbc_driver_hardcharger import DEFAULT_PORT, GIZMODATA_CLOUD_PORT, manifest
 from adbc_driver_hardcharger import dbapi as hardcharger
 from adbc_driver_hardcharger._driver import _driver_path
 
@@ -337,6 +337,7 @@ def test_value_helpers():
     with pytest.raises(expected_exception=TypeError, match="str, int or bool, not float"):
         hardcharger._setting_text(value=1.5)
     assert DEFAULT_PORT == 31337
+    assert GIZMODATA_CLOUD_PORT == 443
 
 
 class TestManifest:

@@ -51,6 +51,35 @@ func TestToChargewireURI(t *testing.T) {
 	}
 }
 
+// A GizmoData Cloud host (gizmodata.com or a name under it, in any case, with
+// or without a trailing dot) answers on 443, so a hardcharger:// URI without a
+// port gets 443 there. An explicit port always wins, and every other host,
+// look-alikes that only contain the name included, keeps 31337.
+func TestToChargewireURIGizmoDataCloudPort(t *testing.T) {
+	for raw, want := range map[string]string{
+		"hardcharger://gizmodata.com":                         "chargewire://gizmodata.com:443",
+		"hardcharger://acme-prod.us-east-1.aws.gizmodata.com": "chargewire://acme-prod.us-east-1.aws.gizmodata.com:443",
+		"hardcharger://ACME.GizmoData.COM":                    "chargewire://ACME.GizmoData.COM:443",
+		"hardcharger://acme.gizmodata.com.":                   "chargewire://acme.gizmodata.com.:443",
+		"hardcharger://joe@acme.gizmodata.com/base?tls=true":  "chargewire://joe@acme.gizmodata.com:443/base?tls=true",
+		"hardcharger://acme.gizmodata.com:31337":              "chargewire://acme.gizmodata.com:31337",
+		"hardcharger://gizmodata.com:8443":                    "chargewire://gizmodata.com:8443",
+		"hardcharger://evilgizmodata.com":                     "chargewire://evilgizmodata.com:31337",
+		"hardcharger://acme.evilgizmodata.com":                "chargewire://acme.evilgizmodata.com:31337",
+		"hardcharger://gizmodata.com.example.org":             "chargewire://gizmodata.com.example.org:31337",
+		"hardcharger://acme.gizmodata.com.example.org":        "chargewire://acme.gizmodata.com.example.org:31337",
+		"hardcharger://gizmodata.co":                          "chargewire://gizmodata.co:31337",
+		"hardcharger://xgizmodata.com.":                       "chargewire://xgizmodata.com.:31337",
+		"hardcharger://gizmodata.com.":                        "chargewire://gizmodata.com.:443",
+		"hardcharger://.gizmodata.com":                        "chargewire://.gizmodata.com:31337", // no label before the dot
+	} {
+		got, err := ToChargewireURI(raw)
+		if err != nil || got != want {
+			t.Errorf("ToChargewireURI(%q) = %q, %v; want %q", raw, got, err, want)
+		}
+	}
+}
+
 func wantStatus(t *testing.T, err error, status adbc.Status, text string) {
 	t.Helper()
 	var adbcErr adbc.Error

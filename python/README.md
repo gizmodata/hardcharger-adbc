@@ -37,7 +37,7 @@ default results split into up to 32 partitions read at once and bulk ingests sen
 every ADBC language loads. On top of Chargewire it adds what is particular to Hardcharger, for
 every language at once:
 
-- 🏎️ **`hardcharger://` URIs**, with Hardcharger's port 31337 as the default;
+- 🏎️ **`hardcharger://` URIs**, with Hardcharger's port 31337 as the default (443 for GizmoData Cloud hosts);
 - 🏷️ **query and session tags**, recorded with every statement in Hardcharger's instrumentation;
 - ⚙️ **`hardcharger.*` settings**: set them for every session, or read, set and reset them on one;
 - 🌐 **browser sign-in** through the server's identity provider (SSO);
@@ -47,8 +47,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.3.0, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
-> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.0;
+> **Status: 2.4.0, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.2;
 > tested against `hardcharger-server` 2.7.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |
@@ -126,7 +126,8 @@ in `go/`). The package is `github.com/gizmodata/hardcharger-adbc/go/v2/hardcharg
 | URI | Meaning |
 |---|---|
 | `hardcharger://host` | HTTPS to `host:31337` |
-| `hardcharger://host:port` | HTTPS to another port |
+| `hardcharger://cluster.gizmodata.com` | HTTPS to `cluster.gizmodata.com:443`: a GizmoData Cloud host (`gizmodata.com` or any name under it) defaults to 443 |
+| `hardcharger://host:port` | HTTPS to another port (an explicit port always wins, on GizmoData Cloud too) |
 | `hardcharger://host?tls=false` | Plain HTTP (development, loopback) |
 | `hardcharger://host:port/custom/prefix` | The server mounts Chargewire under `/custom/prefix` |
 | `chargewire://…`, `https://…`, `http://…` | The Chargewire driver's own spellings, as they are |

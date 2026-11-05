@@ -10,7 +10,8 @@ Example::
             cur.execute(operation="SELECT 42 AS answer")
             print(cur.fetch_arrow_table())
 
-``hardcharger://host[:port]`` is HTTPS (TLS on), with the port defaulting to 31337; add
+``hardcharger://host[:port]`` is HTTPS (TLS on), with the port defaulting to 31337 (443 for a
+GizmoData Cloud host, ``gizmodata.com`` or a name under it); add
 ``?tls=false`` for plain HTTP to a development server. The URI, the browser sign-in, tags and
 settings are handled by the driver library (``libadbc_driver_hardcharger``), so every ADBC
 language gets the same behaviour; this module only maps keyword arguments to its options.
@@ -297,8 +298,8 @@ def connect(
 
     Args:
         uri: ``hardcharger://host[:port][?tls=false]``: HTTPS unless ``?tls=false``, port 31337
-            unless given. ``chargewire://``, ``https://`` and ``http://`` URIs work too, as does
-            ``profile://<name>``.
+            unless given (443 for a GizmoData Cloud host, ``*.gizmodata.com``). ``chargewire://``,
+            ``https://`` and ``http://`` URIs work too, as does ``profile://<name>``.
         profile: Name (or absolute path) of an ADBC connection profile. Install the
             driver manifest first (``python -m adbc_driver_hardcharger.manifest``); profiles
             resolve ``driver = "hardcharger"`` through the ADBC driver manager.

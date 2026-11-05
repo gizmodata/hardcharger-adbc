@@ -6,6 +6,43 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-05
+
+For Hardcharger 2.7.0, on chargewire-adbc 2.2.2.
+
+### Added
+
+- **GizmoData Cloud hosts default to port 443.** A `hardcharger://` URI without a port now
+  connects to 443 when its host is `gizmodata.com` or a name under it (any case, a trailing dot
+  allowed), where GizmoData Cloud clusters answer: `hardcharger://acme.us-east-1.aws.gizmodata.com`
+  is `acme.us-east-1.aws.gizmodata.com:443`. An explicit port always wins, and every other host,
+  look-alikes such as `evilgizmodata.com` or `gizmodata.com.example.org` included, keeps 31337.
+  The Hardcharger CLI applies the same rule. Go: `hardcharger.IsGizmoDataCloudHost`,
+  `hardcharger.GizmoDataCloudPort`; Python: `adbc_driver_hardcharger.GIZMODATA_CLOUD_PORT`.
+
+### Fixed
+
+- **A statement could run again, in autocommit, after its transaction was lost** (chargewire-adbc
+  2.2.1). Hardcharger servers through 2.7.0 can answer `BEGIN` before the session document shows
+  the transaction, so the driver could read `"none"` right after it; when the session was then
+  lost (a server restart, an idle eviction), the next statement ran again on the replacement
+  session on its own: after `BEGIN; INSERT 1;` and a restart, `INSERT 2` was committed alone. The
+  driver now assumes a transaction is open after any statement that can begin one (`BEGIN`,
+  `START`, `TRANSACTION`, `AUTOCOMMIT`, `EXECUTE`) until a statement that can end it (`COMMIT`,
+  `ROLLBACK`, `END`, `ABORT`) runs and the server then says none is open; until then a request
+  that finds the session lost fails with the transaction named as lost instead of running again.
+  This holds against servers already deployed.
+- **A request ran again without the lost session's `USE` and settings** (chargewire-adbc 2.2.2).
+  After a lost session with no transaction open, the driver ran the request again in the new
+  session, which has none of what SQL set in the old one: after `USE other_schema`, an
+  `INSERT INTO t` landed in the connection's own schema's `t`, without an error. After a statement
+  whose first word is `USE`, `SET`, `RESET`, `PRAGMA` or `EXECUTE`, a request that finds the
+  session lost now fails with a message saying the session's settings and `USE` are gone, and the
+  next one runs in the new session. The connection's own settings and tags
+  (`adbc.hardcharger.setting.*`, the session and query tags, Python's `set_setting()`, ...) don't
+  count: the driver sets them up again in every new session, so a request still runs again after
+  them.
+
 ## [2.3.0] - 2026-11-05
 
 For Hardcharger 2.7.0, on chargewire-adbc 2.2.0 (Chargewire 2.2.0's `server_resuming`, spec §11.2).
