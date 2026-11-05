@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ## [2.3.0] - 2026-11-05
 
-For Hardcharger 2.7.0 (Chargewire 2.1.0), on chargewire-adbc 2.2.0.
+For Hardcharger 2.7.0, on chargewire-adbc 2.2.0 (Chargewire 2.2.0's `server_resuming`, spec §11.2).
 
 ### Fixed
 
