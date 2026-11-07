@@ -20,9 +20,15 @@ For Hardcharger 2.7.0, on chargewire-adbc 2.2.4.
   signs in, opens its session and applies the session tag, query tag and
   `adbc.hardcharger.setting.*` settings at its first request that does work. Closing a connection
   that did nothing sends nothing. A wrong password fails that first request instead of the
-  connect. A serving server is connected to as before. (`Open` now runs the tags and settings
-  itself only for a session it attached to, `adbc.chargewire.session.id`; for any other session
-  the new-session hook runs them when the session opens.)
+  connect. Options set on the connection before that request wait for it too: the current
+  catalog and schema (`adbc.connection.catalog`/`db_schema`, Python's `catalog=`/`db_schema=`)
+  go with the request that opens the session, and `adbc.hardcharger.session_tag`, `query_tag`
+  and `setting.*` set on the connection run with the setup, after the session opens and before
+  the first statement; a refused value fails that statement. (Global settings,
+  `adbc.hardcharger.global_setting.*`, still run when set.) A serving server is connected to as
+  before. `Open` now runs the setup itself only for a session it attached to
+  (`adbc.chargewire.session.id`); any other session gets it from the new-session hook when it
+  opens.
 
 ## [2.4.1] - 2026-11-06
 

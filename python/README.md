@@ -156,7 +156,8 @@ its stand-in says so at discovery (`"state": "stopped"`), and opening a connecti
 `connect()`, `AdbcConnectionInit`) signs in and opens nothing. The connection signs in, opens its
 session, applies the session tag, query tag and `adbc.hardcharger.setting.*` settings, and so
 starts the cluster at its first request that does work (a statement, metadata, an ingest, a
-commit or rollback). Closing a connection that did nothing sends nothing, so a pool that opens and
+commit or rollback). Those options, and the current catalog and schema, wait for it even when set
+on the connection after it opened; a refused value fails that first request. Closing a connection that did nothing sends nothing, so a pool that opens and
 closes idle connections on a timer doesn't start a stopped cluster. A wrong password fails that
 first request instead of the connect. A serving server is connected to at once, as before (see
 the [Chargewire driver](https://github.com/gizmodata/chargewire-adbc#-how-it-behaves)).

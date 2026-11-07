@@ -25,6 +25,7 @@ type fakeStopped struct {
 	mu       sync.Mutex
 	requests []string
 	sql      []string
+	created  []map[string]any // the options of each session created
 }
 
 func newFakeStopped(t *testing.T, state string) *fakeStopped {
@@ -50,6 +51,13 @@ func newFakeStopped(t *testing.T, state string) *fakeStopped {
 		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/auth/token":
 			reply(http.StatusOK, map[string]any{"access_token": "tok", "token_type": "Bearer", "expires_in": 3600})
 		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/sessions":
+			var body struct {
+				Options map[string]any `json:"options"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			f.mu.Lock()
+			f.created = append(f.created, body.Options)
+			f.mu.Unlock()
 			reply(http.StatusCreated, map[string]any{"session_id": "s1", "options": map[string]any{}})
 		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/sessions/s1/statements":
 			var body struct {
@@ -144,5 +152,56 @@ func TestConnectToAServingServerSetsTheSessionUpAtOpen(t *testing.T) {
 	if !slices.Equal(requests[:3], []string{"GET /chargewire", "POST /chargewire/v1/auth/token", "POST /chargewire/v1/sessions"}) ||
 		len(sql) != 2 {
 		t.Fatalf("requests %v and statements %q at Open, want a sign-in, a session and its two SETs", requests, sql)
+	}
+}
+
+// Options set on a connection to a stopped server before its first request
+// (the current catalog, a query tag, a session setting) send nothing either:
+// the catalog goes with the request that opens the session, and the tags and
+// settings run in the new-session hook right after it, before the first
+// statement. The order on the wire: sign-in, session, setup, statement.
+func TestLazyConnectDefersConnectionOptionsToTheFirstStatement(t *testing.T) {
+	f := newFakeStopped(t, "stopped")
+	ctx := context.Background()
+	cnxn := openStopped(t, f)
+	setter := cnxn.(adbc.GetSetOptionsWithContext)
+	for key, value := range map[string]string{
+		adbc.OptionKeyCurrentCatalog:          "lake",
+		OptionQueryTag:                        `{"job":"nightly"}`,
+		OptionSettingPrefix + "query_timeout": "30",
+	} {
+		if err := setter.SetOption(ctx, key, value); err != nil {
+			t.Fatalf("SetOption(%s): %v", key, err)
+		}
+	}
+	if requests, _ := f.sent(); !slices.Equal(requests, []string{"GET /chargewire"}) {
+		t.Fatalf("requests after Open and SetOption %v, want the discovery request only", requests)
+	}
+	stmt, err := cnxn.NewStatement(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stmt.SetSqlQuery(ctx, "SELECT 1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stmt.ExecuteUpdate(ctx); err != nil {
+		t.Fatalf("first statement: %v", err)
+	}
+	_ = stmt.Close(ctx)
+	requests, sql := f.sent()
+	want := []string{"GET /chargewire", "POST /chargewire/v1/auth/token", "POST /chargewire/v1/sessions"}
+	if !slices.Equal(requests[:min(len(requests), 3)], want) {
+		t.Fatalf("requests %v, want them to begin %v", requests, want)
+	}
+	f.mu.Lock()
+	created := f.created
+	f.mu.Unlock()
+	if len(created) != 1 || created[0]["catalog"] != "lake" {
+		t.Fatalf("sessions created with options %v, want one with catalog lake", created)
+	}
+	wantSQL := []string{`SET SESSION hardcharger.session_tag = '{"app":"pool"}'`,
+		`SET SESSION hardcharger.query_tag = '{"job":"nightly"}'`, "SET SESSION hardcharger.query_timeout = '30'", "SELECT 1"}
+	if !slices.Equal(sql, wantSQL) {
+		t.Fatalf("statements\n%q\nwant\n%q", sql, wantSQL)
 	}
 }

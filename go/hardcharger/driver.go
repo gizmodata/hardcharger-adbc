@@ -200,8 +200,9 @@ func (db *database) Open(ctx context.Context) (adbc.ConnectionWithContext, error
 	db.mu.Lock()
 	db.shared, db.sharedToken = nil, "" // the server took it: this database is signed in for good
 	db.mu.Unlock()
-	cnxn := &connection{Connection: inner.(driverbase.Connection), setup: setup}
-	if !setup.applied.Load() && db.attaching() {
+	attached := db.attaching()
+	cnxn := &connection{Connection: inner.(driverbase.Connection), setup: setup, attached: attached}
+	if !setup.applied.Load() && attached {
 		// A session the connection attached to (adbc.chargewire.session.id): the
 		// driver didn't create it, so its hook didn't run. It gets the
 		// database's tags and settings now, as before; it is never replaced.
@@ -286,6 +287,9 @@ type connection struct {
 	driverbase.Connection
 	// setup is what every session of the connection gets (sessionSetup).
 	setup *sessionSetup
+	// attached: the session is one the connection attached to
+	// (adbc.chargewire.session.id), which the new-session hook never sets up.
+	attached bool
 }
 
 func (c *connection) SetOption(ctx context.Context, key, value string) error {
@@ -298,6 +302,15 @@ func (c *connection) SetOption(ctx context.Context, key, value string) error {
 	}
 	if name == "" {
 		return c.Connection.SetOption(ctx, key, value)
+	}
+	if !global && !c.attached && !c.setup.applied.Load() {
+		// The connection's session isn't open yet (a stopped server: it
+		// opens at the first request that does work). Running the SET now
+		// would open it and start the server; the new-session hook runs it
+		// when the session opens instead, before that request, which a
+		// refused value then fails.
+		c.setup.record(name, value)
+		return nil
 	}
 	// The new-session hook sets a session setting up again in every session
 	// that replaces this one (and a global one outlives the session), so the
