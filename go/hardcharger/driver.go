@@ -87,6 +87,7 @@ type database struct {
 	chargewireURI     string            // as handed to the Chargewire driver
 	chargewireOptions map[string]string // Chargewire options seen, for the sign-in's TLS
 	signedIn          bool
+	token             string // the token of the last browser sign-in
 	// shared and sharedToken are the shared sign-in this database took its
 	// token from, when it did not sign in itself (OptionOAuthShareSignIn).
 	shared      *sharedSignIn
@@ -185,6 +186,12 @@ func (db *database) Open(ctx context.Context) (adbc.ConnectionWithContext, error
 	setup := newSessionSetup(db.cfg)
 	db.mu.Unlock()
 	hooked := chargewire.WithNewSessionHook(ctx, setup.apply)
+	if db.cfg.authType == AuthTypeExternal {
+		// A connection opened while the cluster is stopped whose first
+		// request finds the database's token revoked (a person stopped the
+		// cluster, which ended it) signs in through the browser again, once.
+		hooked = chargewire.WithReauthenticate(hooked, db.reauthenticate)
+	}
 	inner, err := db.Database.Open(hooked)
 	if err != nil && db.refusedSharedToken(err) {
 		// The server refused a shared token it had not seen from this database
@@ -258,8 +265,31 @@ func (db *database) signIn(ctx context.Context) error {
 	if err := db.Database.SetOption(ctx, optionAccessToken, token); err != nil {
 		return err
 	}
-	db.signedIn = true
+	db.signedIn, db.token = true, token
 	return nil
+}
+
+// reauthenticate runs the browser sign-in again for a connection opened while
+// the cluster was stopped, whose first request found refused, the
+// database's token, revoked: a person stopped the cluster, which ended the
+// tokens issued until then. The identity provider usually signs the person in
+// again at once (single sign-on). A shared sign-in's token is dropped first,
+// so it isn't handed out again. When another connection already replaced the
+// token, that one is used.
+func (db *database) reauthenticate(ctx context.Context, refused string) error {
+	db.mu.Lock()
+	if db.token != refused {
+		db.mu.Unlock()
+		return nil
+	}
+	if db.cfg.shareSignIn {
+		chargewireOptions := maps.Clone(db.chargewireOptions)
+		chargewireOptions[adbc.OptionKeyURI] = db.chargewireURI
+		sharedSignInFor(signInKeyFor(db.chargewireURI, chargewireOptions, db.cfg.signInKey)).forget(refused)
+	}
+	db.shared, db.sharedToken, db.signedIn = nil, "", false
+	db.mu.Unlock()
+	return db.signIn(ctx)
 }
 
 // refusedSharedToken reports that opening failed because the server refused

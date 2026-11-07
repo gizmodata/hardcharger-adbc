@@ -47,8 +47,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.4.4, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
-> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.6;
+> **Status: 2.4.5, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.7;
 > tested against `hardcharger-server` 2.7.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |
@@ -248,6 +248,15 @@ access token. The identity provider's settings stay on the server. `open_browser
 (option `oauth.browser=none`) prints the URL instead, for a remote shell; a string is the
 command to open it with. The token can't be renewed: when it expires, open a new connection
 and sign in again.
+
+Stopping a GizmoData Cloud cluster ends the tokens issued until then. A connection opened while
+the cluster is stopped that finds its database's token refused that way at its first statement
+(`invalid_token`, reason `token_revoked`) runs the browser sign-in again, once (with single
+sign-on the identity provider usually signs you in again without asking), and the statement then
+runs with the new token, starting the cluster; a second refusal is the error. A shared sign-in's
+old token is dropped first. A connection opened before the stop does not sign in again on its own:
+its refusal is the error. With a token supplied from outside (`access_token`), the refusal says the
+token was likely issued before the server was stopped and to supply a new one.
 
 ### One sign-in for many connections
 

@@ -265,6 +265,10 @@ type fakeSignIn struct {
 	secrets  []string
 	sessions []string // the Authorization of each session created
 	server   *httptest.Server
+	// state is the discovery document's state ("stopped", or "" for a
+	// serving server); revoked are tokens refused with token_revoked.
+	state   string
+	revoked map[string]bool
 }
 
 type fakeAnswer struct {
@@ -288,15 +292,24 @@ func newFakeSignIn(t *testing.T, polls ...fakeAnswer) *fakeSignIn {
 			w.WriteHeader(status)
 			_ = json.NewEncoder(w).Encode(body)
 		}
+		if f.revoked[strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")] {
+			reply(401, map[string]any{"code": "invalid_token", "reason": "token_revoked", "status": 401,
+				"detail": "the token was revoked"})
+			return
+		}
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/chargewire":
 			capabilities := []string{}
 			if f.offer {
 				capabilities = append(capabilities, "oauth_browser")
 			}
-			reply(200, map[string]any{"protocol": "chargewire", "protocol_versions": []string{"1"},
+			doc := map[string]any{"protocol": "chargewire", "protocol_versions": []string{"1"},
 				"server": map[string]string{"name": "Hardcharger", "version": "0"}, "capabilities": capabilities,
-				"auth": map[string]any{"grant_types": []string{"password"}, "oauth_browser": map[string]string{}}})
+				"auth": map[string]any{"grant_types": []string{"password"}, "oauth_browser": map[string]string{}}}
+			if f.state != "" {
+				doc["state"] = f.state
+			}
+			reply(200, doc)
 		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/auth/oauth/flows":
 			reply(201, map[string]any{"flow_id": "f_1", "poll_secret": fakePollSecret,
 				"authorize_url": "http://idp/authorize?state=s", "poll_interval_s": 1, "expires_at": "2099-01-01T00:00:00Z"})
@@ -314,6 +327,9 @@ func newFakeSignIn(t *testing.T, polls ...fakeAnswer) *fakeSignIn {
 		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/sessions":
 			f.sessions = append(f.sessions, r.Header.Get("Authorization"))
 			reply(201, map[string]any{"session_id": "s1", "options": map[string]any{}})
+		case r.Method == http.MethodPost && r.URL.Path == "/chargewire/v1/sessions/s1/statements":
+			reply(201, map[string]any{"statement_id": "q1", "state": "succeeded",
+				"result": map[string]any{"kind": "update", "rows_affected": 0}})
 		case r.Method == http.MethodDelete:
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -638,5 +654,169 @@ func TestSessionSetupStatements(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("statements\n%q\nwant\n%q", got, want)
+	}
+}
+
+// stop makes the fake a stopped cluster's stand-in that refuses tokens (a
+// person stopped the cluster, which ended the tokens issued until then).
+func (f *fakeSignIn) stop(tokens ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.state = "stopped"
+	if f.revoked == nil {
+		f.revoked = map[string]bool{}
+	}
+	for _, token := range tokens {
+		f.revoked[token] = true
+	}
+}
+
+func (f *fakeSignIn) sessionsOpened() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.sessions)
+}
+
+func completeWith(token string) fakeAnswer {
+	return fakeAnswer{200, map[string]any{"state": "complete", "access_token": token, "token_type": "Bearer",
+		"expires_in": 3600}}
+}
+
+func runUpdate(ctx context.Context, cnxn adbc.ConnectionWithContext) error {
+	stmt, err := cnxn.NewStatement(ctx)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close(ctx)
+	if err := stmt.SetSqlQuery(ctx, "CREATE TABLE t (x INT)"); err != nil {
+		return err
+	}
+	_, err = stmt.ExecuteUpdate(ctx)
+	return err
+}
+
+// A browser sign-in's token, from before a person stopped the cluster, is
+// refused (token_revoked) at the first statement of a connection opened
+// after the stop: the driver signs in through the browser again, once (with
+// single sign-on, at once), and the statement runs with the new token.
+func TestNewConnectionAfterAStopSignsInThroughTheBrowserAgain(t *testing.T) {
+	opened := 0
+	withBrowser(t, func(string, string) error { opened++; return nil })
+	fake := newFakeSignIn(t, completeWith("token-1"), completeWith("token-2"))
+	db, err := newDB(t, fake.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	first, err := db.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close(ctx)
+	fake.stop("token-1")
+	second, err := db.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close(ctx)
+	if opened != 1 {
+		t.Fatalf("browser opened %d times by the Opens, want once", opened)
+	}
+	if err := runUpdate(ctx, second); err != nil {
+		t.Fatalf("first statement after the stop: %v", err)
+	}
+	if opened != 2 {
+		t.Fatalf("browser opened %d times, want 2 (the sign-in again)", opened)
+	}
+	if got := fake.sessionsOpened(); !slices.Equal(got, []string{"Bearer token-1", "Bearer token-2"}) {
+		t.Fatalf("sessions opened with %q, want token-1 then token-2", got)
+	}
+}
+
+// A refusal after signing in again is the error: one browser sign-in again,
+// not a loop.
+func TestNewConnectionAfterAStopReportsASecondRefusal(t *testing.T) {
+	opened := 0
+	withBrowser(t, func(string, string) error { opened++; return nil })
+	fake := newFakeSignIn(t, completeWith("token-1"), completeWith("token-2"), completeWith("token-3"))
+	db, err := newDB(t, fake.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	first, err := db.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close(ctx)
+	fake.stop("token-1", "token-2")
+	second, err := db.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close(ctx)
+	if err := runUpdate(ctx, second); err == nil || !strings.Contains(err.Error(), "token_revoked") {
+		t.Fatalf("first statement: %v, want the second token_revoked refusal", err)
+	}
+	if opened != 2 {
+		t.Fatalf("browser opened %d times, want 2 (one sign-in again)", opened)
+	}
+}
+
+// The twin: a connection opened before the stop never signs in again on its
+// own (§4.2): its refusal is the error, and no browser opens.
+func TestConnectionFromBeforeAStopDoesNotOpenTheBrowser(t *testing.T) {
+	opened := 0
+	withBrowser(t, func(string, string) error { opened++; return nil })
+	fake := newFakeSignIn(t, completeWith("token-1"), completeWith("token-2"))
+	db, err := newDB(t, fake.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	cnxn, err := db.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cnxn.Close(ctx)
+	fake.stop("token-1")
+	if err := runUpdate(ctx, cnxn); err == nil || !strings.Contains(err.Error(), "token_revoked") {
+		t.Fatalf("statement after the stop: %v, want the token_revoked refusal", err)
+	}
+	if opened != 1 {
+		t.Fatalf("browser opened %d times, want once (the first sign-in)", opened)
+	}
+}
+
+// With a shared browser sign-in, the token from before the stop is dropped
+// from the share before signing in again, so the new connection gets a new
+// token rather than the shared old one.
+func TestNewConnectionAfterAStopDropsTheSharedToken(t *testing.T) {
+	ForgetSharedSignIns()
+	t.Cleanup(ForgetSharedSignIns)
+	opened := 0
+	withBrowser(t, func(string, string) error { opened++; return nil })
+	fake := newFakeSignIn(t, completeWith("token-1"), completeWith("token-2"))
+	db, err := newDB(t, fake.options(OptionOAuthShareSignIn, "true", OptionOAuthSignInKey, "reauth-test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	first, err := db.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close(ctx)
+	fake.stop("token-1")
+	second, err := db.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close(ctx)
+	if err := runUpdate(ctx, second); err != nil {
+		t.Fatalf("first statement after the stop: %v", err)
+	}
+	if got := fake.sessionsOpened(); opened != 2 || !slices.Equal(got, []string{"Bearer token-1", "Bearer token-2"}) {
+		t.Fatalf("browser opened %d times, sessions opened with %q; want 2 and token-1 then token-2", opened, got)
 	}
 }
