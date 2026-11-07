@@ -47,8 +47,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.4.3, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
-> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.5;
+> **Status: 2.4.4, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.6;
 > tested against `hardcharger-server` 2.7.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |

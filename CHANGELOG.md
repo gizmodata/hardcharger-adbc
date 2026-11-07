@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.4] - 2026-11-07
+
+For Hardcharger 2.7.0, on chargewire-adbc 2.2.6.
+
+### Fixed
+
+- **A connection opened after a person stopped the cluster could never start it again**
+  (chargewire-adbc 2.2.6). Stopping a GizmoData Cloud cluster ends the tokens issued until then
+  (`invalid_token`, reason `token_revoked`). A database that had signed in while the cluster was
+  serving kept its token, so a connection opened after the stop sent it at its first statement,
+  was refused, and didn't sign in again: every new connection of that database failed. A
+  connection opened while the cluster is stopped now signs in afresh at its first statement, which
+  starts the cluster. Connections opened before the stop still don't sign in again on their own.
+
 ## [2.4.3] - 2026-11-07
 
 For Hardcharger 2.7.0, on chargewire-adbc 2.2.5.
