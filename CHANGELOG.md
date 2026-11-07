@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-11-06
+
+For Hardcharger 2.7.0, on chargewire-adbc 2.2.3.
+
+### Fixed
+
+- **Closing a connection could wake a stopped GizmoData Cloud cluster** (chargewire-adbc 2.2.3).
+  The driver renews its access token with the saved credentials shortly before it expires, on
+  whatever request comes next, and a close or cancel was such a request: closing a connection late
+  in its token's life signed in again, which starts a stopped auto-resume cluster for nobody, or
+  undoes a person's Stop. Closes, cancels and ingest aborts now never sign in, before sending or
+  after an `invalid_token` refusal, and don't wait out a resume (`server_resuming`): they carry the
+  token the driver has, and a close the server refuses for its token is done (the session is gone
+  or idles out). Aborting an ingest of a lost session no longer opens a replacement session either.
+  Requests that do work renew the token as before.
+
 ## [2.4.0] - 2026-11-05
 
 For Hardcharger 2.7.0, on chargewire-adbc 2.2.2.
