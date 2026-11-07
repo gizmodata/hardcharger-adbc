@@ -47,8 +47,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.4.1, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
-> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.2;
+> **Status: 2.4.2, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.4;
 > tested against `hardcharger-server` 2.7.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |
@@ -150,6 +150,17 @@ throughput and one waits for a resuming server; the driver keeps the Chargewire 
 | `adbc.chargewire.statement.result_partitions` | 32 | A large result is split into up to this many partitions, read at once over their own connections (the server decides; a result of fewer than two batches is one stream). `1`: never split |
 | `adbc.chargewire.ingest.parts` (also `adbc.hardcharger.ingest.parts`) | `auto` | A bulk ingest of two batches or more goes over up to this many connections, committed as one. Its rows land in no defined order; `1`: one stream, in the upload's order |
 | `adbc.chargewire.resume_timeout` (also `adbc.hardcharger.resume_timeout`; Python `resume_timeout=`) | 600 | Seconds to keep sending a request again while the server answers `server_resuming`: a stopped GizmoData Cloud cluster starting again because a client connected. Each repeat waits the answer's `Retry-After` (at least 1 s, at most 60 s; 3 s without one), the sign-in included; then the error is `server_resuming` (`StatusIO`). `0`: fail at once. Database only |
+
+**A stopped GizmoData Cloud cluster isn't started by connecting.** When the cluster is stopped,
+its stand-in says so at discovery (`"state": "stopped"`), and opening a connection (Python's
+`connect()`, `AdbcConnectionInit`) signs in and opens nothing. The connection signs in, opens its
+session, applies the session tag, query tag and `adbc.hardcharger.setting.*` settings, and so
+starts the cluster at its first request that does work (a statement, metadata, an ingest, a
+commit or rollback). Those options, and the current catalog and schema, wait for it even when set
+on the connection after it opened; a refused value fails that first request. Closing a connection that did nothing sends nothing, so a pool that opens and
+closes idle connections on a timer doesn't start a stopped cluster. A wrong password fails that
+first request instead of the connect. A serving server is connected to at once, as before (see
+the [Chargewire driver](https://github.com/gizmodata/chargewire-adbc#-how-it-behaves)).
 
 Hardcharger's own:
 
