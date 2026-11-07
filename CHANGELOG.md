@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.5] - 2026-11-07
+
+For Hardcharger 2.7.0, on chargewire-adbc 2.2.7.
+
+### Fixed
+
+- **A browser sign-in database's connections opened after a Stop could never start the cluster.**
+  Stopping a GizmoData Cloud cluster ends the tokens issued until then (`invalid_token`, reason
+  `token_revoked`). With `auth_type="external"` the database kept its browser sign-in's token, and
+  2.4.4's fresh sign-in needs a password, so every connection opened after the Stop failed at its
+  first statement. Such a connection now runs the browser sign-in again, once (usually silent with
+  single sign-on), drops a shared sign-in's old token first, and runs the statement with the new
+  token, which starts the cluster; a second refusal is the error. Connections opened before the
+  Stop still never sign in again on their own.
+
+### Changed
+
+- **A token supplied from outside (`access_token`)** that a connection opened after a Stop finds
+  revoked still fails, now saying the token was likely issued before the server was stopped and to
+  supply a new one (chargewire-adbc 2.2.7).
+
 ## [2.4.4] - 2026-11-07
 
 For Hardcharger 2.7.0, on chargewire-adbc 2.2.6.
