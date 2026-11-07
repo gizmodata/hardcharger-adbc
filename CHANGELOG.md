@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-11-07
+
+For Hardcharger 2.7.0, on chargewire-adbc 2.2.5.
+
+### Fixed
+
+- **A pool that kept one database still started a stopped cluster at its refills**
+  (chargewire-adbc 2.2.5). 2.4.2 decided whether to connect lazily from the database's first
+  discovery, so a Go app that keeps one database and pools its connections went on signing in
+  and setting up sessions at every refill after the cluster stopped, starting it again. Every
+  Open after the database's first connection now reads discovery again (one small `GET`, which
+  never wakes a cluster) and connects lazily while the cluster is stopped, at once while it
+  serves. Python's `connect()` makes its own database each time and was not affected.
+
 ## [2.4.2] - 2026-11-07
 
 For Hardcharger 2.7.0, on chargewire-adbc 2.2.4.
