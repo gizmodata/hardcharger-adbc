@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-11-07
+
+For Hardcharger 2.7.0, on chargewire-adbc 2.2.4.
+
+### Added
+
+- **Connecting doesn't start a stopped GizmoData Cloud cluster** (chargewire-adbc 2.2.4). A
+  connection pool opens connections on a timer, and each new connection signed in and opened a
+  session, which starts a stopped auto-resume cluster: a pooled app woke an idle-stopped cluster
+  at every refill, and right after a person's Stop. When discovery says the server is stopped
+  (`"state": "stopped"`), opening a connection now signs in and opens nothing. The connection
+  signs in, opens its session and applies the session tag, query tag and
+  `adbc.hardcharger.setting.*` settings at its first request that does work. Closing a connection
+  that did nothing sends nothing. A wrong password fails that first request instead of the
+  connect. A serving server is connected to as before. (`Open` now runs the tags and settings
+  itself only for a session it attached to, `adbc.chargewire.session.id`; for any other session
+  the new-session hook runs them when the session opens.)
+
 ## [2.4.1] - 2026-11-06
 
 For Hardcharger 2.7.0, on chargewire-adbc 2.2.3.

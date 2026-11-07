@@ -201,16 +201,27 @@ func (db *database) Open(ctx context.Context) (adbc.ConnectionWithContext, error
 	db.shared, db.sharedToken = nil, "" // the server took it: this database is signed in for good
 	db.mu.Unlock()
 	cnxn := &connection{Connection: inner.(driverbase.Connection), setup: setup}
-	if !setup.applied.Load() {
+	if !setup.applied.Load() && db.attaching() {
 		// A session the connection attached to (adbc.chargewire.session.id): the
 		// driver didn't create it, so its hook didn't run. It gets the
 		// database's tags and settings now, as before; it is never replaced.
+		// A connection to a stopped server has no session yet (it opens at
+		// the first request that does work, and the hook sets it up then):
+		// running the setup now would open it and start the server.
 		if _, err := setup.run(ctx, cnxn.exec); err != nil {
 			_ = inner.Close(ctx)
 			return nil, err
 		}
 	}
 	return cnxn, nil
+}
+
+// attaching reports whether the database's connections attach to an
+// existing session (chargewire.OptionSessionID) rather than create one.
+func (db *database) attaching() bool {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	return db.chargewireOptions[chargewire.OptionSessionID] != ""
 }
 
 func (db *database) signIn(ctx context.Context) error {
