@@ -14,9 +14,9 @@ It fails, never skips, without its server.
 ```bash
 make -C go lib    # or scripts/build_lib.sh; HARDCHARGER_ADBC_TEST_DRIVER_PATH names another library
 
-# A server whose catalog is `validation`, on a free port of 127.0.0.1:
+# A server whose catalog is `validation` and whose TimeZone is UTC, on a free port of 127.0.0.1:
 docker run -d --name hc-adbc-validation -p 127.0.0.1:31461:31337 \
-  -e HARDCHARGER_ADMIN_PASSWORD="$PASSWORD" ghcr.io/gizmodata/hardcharger:main \
+  -e TZ=UTC -e HARDCHARGER_ADMIN_PASSWORD="$PASSWORD" ghcr.io/gizmodata/hardcharger:main \
   --admin-username hc_adbc_validation --database /tmp/validation.duckdb
 
 cd validation

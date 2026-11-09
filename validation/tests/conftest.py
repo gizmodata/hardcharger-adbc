@@ -87,6 +87,13 @@ def hardcharger_server() -> None:
                     reason=f"the server's catalog is {catalog!r}, not {hardcharger.CATALOG!r}: "
                     f"start it with --database <dir>/{hardcharger.CATALOG}.duckdb"
                 )
+            cursor.execute(operation="SELECT current_setting('TimeZone')")
+            timezone = cursor.fetchone()[0]
+            if timezone != "UTC":
+                pytest.fail(
+                    reason=f"the server's TimeZone is {timezone!r}, not 'UTC': the suite expects "
+                    "TIMESTAMPTZ results as timestamp[tz=UTC]; start the server with TZ=UTC"
+                )
             cursor.execute(
                 operation=f"CREATE SCHEMA IF NOT EXISTS "
                 f"{hardcharger.CATALOG}.{hardcharger.SECONDARY_SCHEMA}"

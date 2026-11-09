@@ -147,7 +147,9 @@ jobs:
 
   # The ADBC Driver Foundry's validation suite (validation/; pinned in validation/requirements.txt),
   # against a server whose catalog is `validation`, through the library built as for a release.
-  # It fails, never skips, without its server; the first run proves that on every build.
+  # It fails, never skips, without its server; the first run proves that on every build. The
+  # server runs with TZ=UTC: the suite expects TIMESTAMPTZ as timestamp[tz=UTC], and DuckDB's
+  # TimeZone otherwise follows the runner's /etc/localtime (Etc/UTC).
   validation:
     name: ADBC validation suite (linux)
     runs-on: ubuntu-24.04
@@ -198,7 +200,7 @@ jobs:
           echo "::add-mask::$password"
           mkdir -p "$RUNNER_TEMP/validation"
           (cd "$RUNNER_TEMP/validation" && env -i PATH="$PATH" HOME="$RUNNER_TEMP/validation" \
-            HARDCHARGER_ADMIN_PASSWORD="$password" "$HARDCHARGER_ADBC_TEST_SERVER_BINARY" \
+            TZ=UTC HARDCHARGER_ADMIN_PASSWORD="$password" "$HARDCHARGER_ADBC_TEST_SERVER_BINARY" \
             --host 127.0.0.1 --port 31470 --health-port 0 --admin-username hc_adbc_validation \
             --database "$RUNNER_TEMP/validation/validation.duckdb" --print-queries false \
             > server.log 2>&1 & echo $! > server.pid)
