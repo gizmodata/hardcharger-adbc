@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.7] - 2026-11-09
+
+Tested with Hardcharger 2.10.0, on chargewire-adbc 2.2.8.
+
+### Fixed
+
+- **The shared library exports only the ADBC entrypoints**, as the
+  [ADBC shared-library requirements](https://adbc-drivers.org/building-drivers/shared-library-requirements.html)
+  ask: `AdbcDriverInit`, `AdbcDriverHardchargerInit` and the other `Adbc*` functions, 57 in all.
+  2.0.0 through 2.4.6 also exported every Go `//export` function and the cgo glue
+  (`HardchargerDatabaseNew`, arrow-go's `streamGetNext`, `_cgo_*`, `crosscall2`, ...): 70 to 255
+  extra names depending on the platform, which could clash with another library's in the same
+  process. The export lists are `go/pkg/hardcharger/exports_linux.map`, `exports_darwin.txt` and
+  `exports_windows.def`, passed by `scripts/build_lib.sh` and `make -C go lib`. Nothing that loads
+  the driver changes: the entrypoints the driver manager and the manifest use are still there.
+
+### Added
+
+- **`go/internal/checkexports`**: checks a built library (ELF, Mach-O or PE) for `AdbcDriverInit`,
+  the entrypoint its file name implies, and no export without the `Adbc` prefix. CI and the
+  release run it on every library they build, on every platform, Windows arm64 included.
+
 ## [2.4.6] - 2026-11-09
 
 Tested with Hardcharger 2.10.0, on chargewire-adbc 2.2.8. The driver now passes the ADBC Driver
