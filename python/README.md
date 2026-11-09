@@ -378,7 +378,7 @@ certificate. Python refuses a different value for the same option in `db_kwargs`
 ## 🗂️ ADBC connection profiles
 
 [ADBC connection profiles](https://arrow.apache.org/adbc/current/format/connection_profiles.html)
-store a reusable connection in TOML. The Python wheel requires `adbc-driver-manager >= 1.12.0`.
+store a reusable connection in TOML. The Python wheel requires `adbc-driver-manager >= 1.13.0`.
 The **ADBC driver manager** resolves the profile, expands
 its environment variables and loads the native driver; the Go driver receives the resolved
 options. Install the driver manifest once in each client environment:

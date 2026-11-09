@@ -15,3 +15,5 @@ python/src/adbc_driver_hardcharger/libadbc_driver_hardcharger.*
 *.so
 *.dylib
 *.dll
+validation/*.xml
+validation/*.log

@@ -24,7 +24,7 @@ if [ "$(go env GOOS)" = "linux" ]; then
   export CC="zig cc -target $TARGET"
 fi
 
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
+VERSION="${VERSION:-$(git describe --tags --match 'v[0-9]*' --always --dirty 2>/dev/null || echo dev)}"
 CGO_ENABLED=1 go build -tags driverlib -buildmode=c-shared \
   -ldflags "-s -w -X github.com/adbc-drivers/driverbase-go/driverbase.infoDriverVersion=$VERSION" \
   -o "build/libadbc_driver_hardcharger.$EXT" ./pkg/hardcharger
