@@ -179,12 +179,18 @@ jobs:
           HARDCHARGER_ADBC_TEST_USERNAME: nobody
           HARDCHARGER_ADBC_TEST_PASSWORD: nothing
         run: |
-          set -uo pipefail
-          .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_connection.py > unreachable.log 2>&1
-          status=$?
+          # The step's shell is bash -e: the expected failure is tested in a condition.
+          if .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_connection.py > unreachable.log 2>&1; then
+            cat unreachable.log
+            echo "::error::the suite passed without a server"
+            exit 1
+          fi
           tail -3 unreachable.log
-          [ "$status" -ne 0 ] || { echo "::error::the suite passed without a server"; exit 1; }
-          grep -q "can't reach the server at hardcharger://127.0.0.1:9" unreachable.log || { echo "::error::the suite failed for another reason"; cat unreachable.log; exit 1; }
+          if ! grep -q "can't reach the server at hardcharger://127.0.0.1:9" unreachable.log; then
+            cat unreachable.log
+            echo "::error::the suite failed for another reason"
+            exit 1
+          fi
       - name: Start a server for the suite
         run: |
           set -euo pipefail
@@ -208,7 +214,8 @@ jobs:
         run: .venv/bin/python -m pytest -p no:cacheprovider -rfEsxX --junit-xml=validation-report.xml
       - name: Server log
         if: failure()
-        run: tail -100 "$RUNNER_TEMP/validation/server.log"
+        run: |
+          if [ -f "$RUNNER_TEMP/validation/server.log" ]; then tail -100 "$RUNNER_TEMP/validation/server.log"; else echo "no server was started"; fi
 
   platforms:
     name: library and Python unit tests (${{ matrix.os }})
