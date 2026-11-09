@@ -3,7 +3,8 @@ name: ci
 # Every suite, on every push and pull request; also the release gate (release.yml calls it on
 # the tagged commit):
 #   - Go: gofmt, vet, unit tests and the live-server suite, with the race detector;
-#   - the C shared library, its glibc ceiling, and the Python bindings' unit and live tests;
+#   - the C shared library, its exports (only Adbc*, go/internal/checkexports), its glibc ceiling,
+#     and the Python bindings' unit and live tests;
 #   - the README's C (through the ADBC driver manager and the manifest) and Go examples, run
 #     against a server on the default port;
 #   - the library and Python unit tests on macOS and Windows;
@@ -103,6 +104,9 @@ jobs:
 
       - name: Build the shared library
         run: scripts/build_lib.sh
+      - name: The library exports only the ADBC entrypoints (Adbc*)
+        working-directory: go
+        run: go run ./internal/checkexports build/libadbc_driver_hardcharger.so
       - name: Check the glibc ceiling (2.17)
         run: scripts/check_glibc.sh go/build/libadbc_driver_hardcharger.so
 
@@ -168,6 +172,9 @@ jobs:
           token: ${{ github.token }}
       - name: Build the shared library
         run: scripts/build_lib.sh
+      - name: The library exports only the ADBC entrypoints (Adbc*)
+        working-directory: go
+        run: go run ./internal/checkexports build/libadbc_driver_hardcharger.so
       - uses: astral-sh/setup-uv@v10.3.3
       - name: Install the suite (Python 3.14)
         working-directory: validation
@@ -241,6 +248,12 @@ jobs:
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
         run: scripts/build_lib.sh
+      - name: The library exports only the ADBC entrypoints (Adbc*)
+        shell: bash
+        working-directory: go
+        run: |
+          case "$RUNNER_OS" in macOS) ext=dylib ;; Windows) ext=dll ;; *) ext=so ;; esac
+          go run ./internal/checkexports "build/libadbc_driver_hardcharger.$ext"
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
