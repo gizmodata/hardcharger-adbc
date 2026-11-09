@@ -23,8 +23,15 @@ Foundry's validation (conformance) suite.
   `ALREADY_EXISTS`, ADBC's status for a table that exists with another schema; it was
   `INVALID_ARGUMENT`. A value that doesn't convert is still the data's error (`INVALID_ARGUMENT`).
 - **The library's `GetInfo` driver version** in builds from a checkout (`make -C go lib`,
-  `scripts/build_lib.sh`, CI) said `go/vX.Y.Z`, the Go module's tag, which isn't a version; it
-  now comes from the release tag (`vX.Y.Z`). Released libraries were not affected.
+  `scripts/build_lib.sh`) said `go/vX.Y.Z`, the Go module's tag, or, in a clone without tags (CI),
+  a bare commit hash, neither a version; it now comes from the release tag (`vX.Y.Z-N-gHASH`), or
+  is `v0.0.0-HASH` without one. Released libraries were not affected.
+- **The macOS wheels said they run on macOS 11**: they are tagged `macosx_13_0` and the library's
+  minimum macOS is 13.0, because the Go 1.27 runtime it is built with requires macOS 13 Ventura.
+  2.0.0 through 2.4.5 were tagged `macosx_11_0`, so pip would install them on macOS 11 and 12,
+  where the Go runtime isn't supported. The release now checks that the library's minimum macOS
+  matches the wheel's tag, and `scripts/build_lib.sh` passes the target in the cgo flags, so Go's
+  build cache (which ignores `MACOSX_DEPLOYMENT_TARGET`) can't reuse a build for another target.
 
 ### Added
 

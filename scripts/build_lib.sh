@@ -24,7 +24,17 @@ if [ "$(go env GOOS)" = "linux" ]; then
   export CC="zig cc -target $TARGET"
 fi
 
-VERSION="${VERSION:-$(git describe --tags --match 'v[0-9]*' --always --dirty 2>/dev/null || echo dev)}"
+# On macOS, the oldest macOS the library runs on (the wheel's tag says the same). It goes into the
+# cgo flags, not only the environment: Go's build cache keys on those flags and not on
+# MACOSX_DEPLOYMENT_TARGET, so a cached build for another target would otherwise be reused.
+if [ "$(go env GOOS)" = "darwin" ] && [ -n "${MACOSX_DEPLOYMENT_TARGET:-}" ]; then
+  export CGO_CFLAGS="${CGO_CFLAGS:--O2 -g} -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET"
+  export CGO_LDFLAGS="${CGO_LDFLAGS:--O2 -g} -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET"
+fi
+
+# The release tag the commit descends from (vX.Y.Z[-N-gHASH][-dirty]); a checkout without tags
+# (CI's shallow clone) is v0.0.0-HASH, so GetInfo's driver version is always a version.
+VERSION="${VERSION:-$(git describe --tags --match 'v[0-9]*' --dirty 2>/dev/null || echo "v0.0.0-$(git rev-parse --short HEAD 2>/dev/null || echo dev)")}"
 CGO_ENABLED=1 go build -tags driverlib -buildmode=c-shared \
   -ldflags "-s -w -X github.com/adbc-drivers/driverbase-go/driverbase.infoDriverVersion=$VERSION" \
   -o "build/libadbc_driver_hardcharger.$EXT" ./pkg/hardcharger
