@@ -6,6 +6,51 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.6] - 2026-11-09
+
+Tested with Hardcharger 2.10.0, on chargewire-adbc 2.2.8. The driver now passes the ADBC Driver
+Foundry's validation (conformance) suite.
+
+### Fixed
+
+- **Setting an option the driver doesn't know on a database that has opened a connection** is
+  `NOT_IMPLEMENTED`, as before the first connection; it was `INVALID_STATE` ("must be set before
+  the first connection is opened"), which said the option exists. A known option is still
+  `INVALID_STATE` then.
+- **Making a catalog or schema that doesn't exist current** (`adbc.connection.catalog`,
+  `adbc.connection.db_schema`) is `NOT_FOUND`, the ADBC status for it; it was `INVALID_ARGUMENT`.
+- **Appending (or `create_append`) data with a column the existing table doesn't have** is
+  `ALREADY_EXISTS`, ADBC's status for a table that exists with another schema; it was
+  `INVALID_ARGUMENT`. A value that doesn't convert is still the data's error (`INVALID_ARGUMENT`).
+- **The library's `GetInfo` driver version** in builds from a checkout (`make -C go lib`,
+  `scripts/build_lib.sh`) said `go/vX.Y.Z`, the Go module's tag, or, in a clone without tags (CI),
+  a bare commit hash, neither a version; it now comes from the release tag (`vX.Y.Z-N-gHASH`), or
+  is `v0.0.0-HASH` without one. Released libraries were not affected.
+- **The macOS wheels said they run on macOS 11**: they are tagged `macosx_13_0` and the library's
+  minimum macOS is 13.0, because the Go 1.27 runtime it is built with requires macOS 13 Ventura.
+  2.0.0 through 2.4.5 were tagged `macosx_11_0`, so pip would install them on macOS 11 and 12,
+  where the Go runtime isn't supported. The release now checks that the library's minimum macOS
+  matches the wheel's tag, and `scripts/build_lib.sh` passes the target in the cgo flags, so Go's
+  build cache (which ignores `MACOSX_DEPLOYMENT_TARGET`) can't reuse a build for another target.
+
+### Added
+
+- **`validation/`**: the [ADBC validation suite](https://github.com/adbc-drivers/validation)
+  (pinned, a test dependency only) configured for this driver, with DuckDB's versions of its type
+  cases, and a CI job that runs it against a server on every push and before every release (it
+  fails, never skips, without its server). 332 passed, 4 skipped, 2 expected failures; each skip
+  and expected failure says why in `validation/README.md`.
+
+### Changed
+
+- **Dependencies**: chargewire-adbc 2.2.8 (its browser re-sign-in after a Stop is for its own
+  `oauth_browser` auth type; this driver's `auth_type="external"` keeps its own), apache
+  arrow-adbc Go 1.13.0, driverbase-go of 2026-11-09 (the generated cgo exports are unchanged),
+  grpc 1.85.0 and the golang.org/x modules; Go toolchain 1.27.3 (the module still needs Go
+  1.27.2). Python: `adbc-driver-manager>=1.13.0`, `pyarrow>=26.0.1`; test and dev extras
+  `pytest>=9.2.0`, `ruff>=0.17.4`. CI: the C example's ADBC driver manager from
+  apache-arrow-adbc-25, setup-uv 10.3.3.
+
 ## [2.4.5] - 2026-11-07
 
 For Hardcharger 2.7.0, on chargewire-adbc 2.2.7.

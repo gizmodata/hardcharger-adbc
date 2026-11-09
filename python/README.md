@@ -378,7 +378,7 @@ certificate. Python refuses a different value for the same option in `db_kwargs`
 ## 🗂️ ADBC connection profiles
 
 [ADBC connection profiles](https://arrow.apache.org/adbc/current/format/connection_profiles.html)
-store a reusable connection in TOML. The Python wheel requires `adbc-driver-manager >= 1.12.0`.
+store a reusable connection in TOML. The Python wheel requires `adbc-driver-manager >= 1.13.0`.
 The **ADBC driver manager** resolves the profile, expands
 its environment variables and loads the native driver; the Go driver receives the resolved
 options. Install the driver manifest once in each client environment:
@@ -564,7 +564,7 @@ the `ghcr.io/gizmodata/hardcharger:main` image (Hardcharger's main branch), pull
 
 Releases follow [semantic versioning](https://semver.org) and [CHANGELOG.md](https://github.com/gizmodata/hardcharger-adbc/blob/main/CHANGELOG.md).
 Pushing a `vX.Y.Z` tag runs every suite on the tagged commit, then builds the library for Linux
-amd64/arm64 (glibc 2.17; installed and loaded on Oracle Linux 8), macOS arm64/amd64 and Windows
+amd64/arm64 (glibc 2.17; installed and loaded on Oracle Linux 8), macOS arm64/amd64 (macOS 13 or later, as Go 1.27 requires) and Windows
 amd64/arm64, wheels for all of them but Windows arm64 (pyarrow and adbc-driver-manager publish
 no wheels there), a GitHub Release with the libraries, wheels and manifest template, and PyPI
 from the `pypi` environment (trusted publishing, after an approval). Before tagging: set

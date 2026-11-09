@@ -27,8 +27,8 @@ classifiers = [
     "Topic :: Database",
 ]
 dependencies = [
-    "adbc-driver-manager>=1.12.0",
-    "pyarrow>=26.0.0",
+    "adbc-driver-manager>=1.13.0",
+    "pyarrow>=26.0.1",
 ]
 
 [project.urls]
@@ -39,12 +39,12 @@ Changelog = "https://github.com/gizmodata/hardcharger-adbc/blob/main/CHANGELOG.m
 
 [project.optional-dependencies]
 test = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "cryptography>=50.0.2",
     "pyjwt>=2.15.1",
 ]
 dev = [
-    "ruff>=0.17.1",
+    "ruff>=0.17.4",
     "build>=1.6.1",
 ]
 

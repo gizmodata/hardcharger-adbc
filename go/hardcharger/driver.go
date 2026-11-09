@@ -64,7 +64,7 @@ type driverImpl struct {
 // Hardcharger's; nothing is sent to the server until the first connection
 // opens.
 func (d *driverImpl) NewDatabaseWithContext(ctx context.Context, opts map[string]string) (adbc.DatabaseWithContext, error) {
-	db := &database{cfg: newConfig(), chargewireOptions: map[string]string{}}
+	db := &database{driver: d.inner, cfg: newConfig(), chargewireOptions: map[string]string{}}
 	chargewireOpts, err := db.take(opts)
 	if err != nil {
 		return nil, err
@@ -80,6 +80,8 @@ func (d *driverImpl) NewDatabaseWithContext(ctx context.Context, opts map[string
 // database wraps the Chargewire database.
 type database struct {
 	driverbase.Database
+	// driver is the Chargewire driver, which made Database.
+	driver driverbase.Driver
 
 	mu                sync.Mutex
 	cfg               *config
@@ -152,6 +154,14 @@ func (db *database) SetOptions(ctx context.Context, opts map[string]string) erro
 	keys := slices.Sorted(maps.Keys(chargewireOpts))
 	for _, key := range keys {
 		if err := db.Database.SetOption(ctx, key, chargewireOpts[key]); err != nil {
+			if status(err) == adbc.StatusInvalidState {
+				// Too late to set it, says the Chargewire driver of every option
+				// once a connection has opened; one it doesn't know is
+				// StatusNotImplemented at any time.
+				if unknown := db.unknownOption(ctx, key, chargewireOpts[key]); unknown != nil {
+					return unknown
+				}
+			}
 			return err
 		}
 	}
@@ -331,6 +341,9 @@ func (c *connection) SetOption(ctx context.Context, key, value string) error {
 		return err
 	}
 	if name == "" {
+		if key == adbc.OptionKeyCurrentCatalog || key == adbc.OptionKeyCurrentDbSchema {
+			return c.setCurrentNamespace(ctx, key, value)
+		}
 		return c.Connection.SetOption(ctx, key, value)
 	}
 	if !global && !c.attached && !c.setup.applied.Load() {

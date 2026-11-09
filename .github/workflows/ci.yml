@@ -6,7 +6,8 @@ name: ci
 #   - the C shared library, its glibc ceiling, and the Python bindings' unit and live tests;
 #   - the README's C (through the ADBC driver manager and the manifest) and Go examples, run
 #     against a server on the default port;
-#   - the library and Python unit tests on macOS and Windows.
+#   - the library and Python unit tests on macOS and Windows;
+#   - the ADBC Driver Foundry's validation (conformance) suite, validation/, against a server.
 #
 # hardcharger-server comes from the image ghcr.io/gizmodata/hardcharger, pulled with this
 # workflow's GITHUB_TOKEN (no personal token); the package grants this repository read access
@@ -38,7 +39,7 @@ env:
   # still works with it (HARDCHARGER_ADBC_TEST_LEGACY_*; those tests fail, not skip, once set).
   HARDCHARGER_LEGACY_IMAGE: ghcr.io/gizmodata/hardcharger:2.2.0
   # The ADBC C driver manager for the C example (apache/arrow-adbc release).
-  ARROW_ADBC_TAG: apache-arrow-adbc-24
+  ARROW_ADBC_TAG: apache-arrow-adbc-25
 
 jobs:
   linux:
@@ -105,7 +106,7 @@ jobs:
       - name: Check the glibc ceiling (2.17)
         run: scripts/check_glibc.sh go/build/libadbc_driver_hardcharger.so
 
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
@@ -144,6 +145,80 @@ jobs:
           (cd go && go run ./examples/hello) | tee go.out
           grep -q 'col\[0\]\[answer\]: \[42\]' go.out
 
+  # The ADBC Driver Foundry's validation suite (validation/; pinned in validation/requirements.txt),
+  # against a server whose catalog is `validation`, through the library built as for a release.
+  # It fails, never skips, without its server; the first run proves that on every build. The
+  # server runs with TZ=UTC: the suite expects TIMESTAMPTZ as timestamp[tz=UTC], and DuckDB's
+  # TimeZone otherwise follows the runner's /etc/localtime (Etc/UTC).
+  validation:
+    name: ADBC validation suite (linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+      - uses: ./.github/actions/hardcharger-server
+        with:
+          image: ${{ env.HARDCHARGER_IMAGE }}
+          token: ${{ github.token }}
+      - name: Build the shared library
+        run: scripts/build_lib.sh
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Install the suite (Python 3.14)
+        working-directory: validation
+        run: |
+          uv venv .venv --python 3.14
+          uv pip install --python .venv/bin/python -r requirements.txt
+      - name: The suite fails when its server is unreachable
+        working-directory: validation
+        env:
+          HARDCHARGER_ADBC_TEST_URI: hardcharger://127.0.0.1:9?tls=false
+          HARDCHARGER_ADBC_TEST_USERNAME: nobody
+          HARDCHARGER_ADBC_TEST_PASSWORD: nothing
+        run: |
+          # The step's shell is bash -e: the expected failure is tested in a condition.
+          if .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_connection.py > unreachable.log 2>&1; then
+            cat unreachable.log
+            echo "::error::the suite passed without a server"
+            exit 1
+          fi
+          tail -3 unreachable.log
+          if ! grep -q "can't reach the server at hardcharger://127.0.0.1:9" unreachable.log; then
+            cat unreachable.log
+            echo "::error::the suite failed for another reason"
+            exit 1
+          fi
+      - name: Start a server for the suite
+        run: |
+          set -euo pipefail
+          password="$(openssl rand -hex 12):p@ss"
+          echo "::add-mask::$password"
+          mkdir -p "$RUNNER_TEMP/validation"
+          (cd "$RUNNER_TEMP/validation" && env -i PATH="$PATH" HOME="$RUNNER_TEMP/validation" \
+            TZ=UTC HARDCHARGER_ADMIN_PASSWORD="$password" "$HARDCHARGER_ADBC_TEST_SERVER_BINARY" \
+            --host 127.0.0.1 --port 31470 --health-port 0 --admin-username hc_adbc_validation \
+            --database "$RUNNER_TEMP/validation/validation.duckdb" --print-queries false \
+            > server.log 2>&1 & echo $! > server.pid)
+          for _ in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:31470/chargewire && break; sleep 1; done
+          curl -sf -o /dev/null http://127.0.0.1:31470/chargewire
+          {
+            echo "HARDCHARGER_ADBC_TEST_URI=hardcharger://127.0.0.1:31470?tls=false"
+            echo "HARDCHARGER_ADBC_TEST_USERNAME=hc_adbc_validation"
+            echo "HARDCHARGER_ADBC_TEST_PASSWORD=$password"
+          } >> "$GITHUB_ENV"
+      - name: Run the suite
+        working-directory: validation
+        run: .venv/bin/python -m pytest -p no:cacheprovider -rfEsxX --junit-xml=validation-report.xml
+      - name: Server log
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/validation/server.log" ]; then tail -100 "$RUNNER_TEMP/validation/server.log"; else echo "no server was started"; fi
+
   platforms:
     name: library and Python unit tests (${{ matrix.os }})
     strategy:
@@ -164,7 +239,7 @@ jobs:
       - name: Build the shared library
         shell: bash
         env:
-          MACOSX_DEPLOYMENT_TARGET: "11.0"
+          MACOSX_DEPLOYMENT_TARGET: "13.0"
         run: scripts/build_lib.sh
       - uses: actions/setup-python@v7
         with:
