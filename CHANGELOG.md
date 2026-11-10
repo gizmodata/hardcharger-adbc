@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **CI**: a change that touches only documentation (`*.md`, `docs/`, `LICENSE`, `NOTICE`) skips the build and test jobs, and one job, `CI result`, reports on every run and is the only required check. The glibc-2.28 install check retries `dnf install` with fresh metadata, so a mirror serving a broken `repomd.xml` can't fail a build.
+- **CI**: the validation suite's server is started directly, so `server.pid` holds its own PID (it held a subshell's, in the wrong directory).
+
 ## [2.4.9] - 2026-11-09
 
 ### Changed
