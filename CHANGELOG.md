@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.9] - 2026-11-09
+
+### Changed
+
+- **README**: the PyPI page shows the ADBC conformance badge: the adbc-drivers.org validation suite runs in CI, and every release waits for it.
+
+No code changes; still built on chargewire-adbc 2.2.9.
+
 ## [2.4.8] - 2026-11-09
 
 Tested with Hardcharger 2.10.0, on chargewire-adbc 2.2.9.
