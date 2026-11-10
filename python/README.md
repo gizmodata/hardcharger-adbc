@@ -47,9 +47,9 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.4.5, compatible with Hardcharger 2.7.0.** Speaks the Chargewire protocol 1.0.0 (as of
-> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.7;
-> tested against `hardcharger-server` 2.7.0, and 2.2.0 for servers from before the rename.
+> **Status: 2.4.8, compatible with Hardcharger 2.10.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.9;
+> tested against `hardcharger-server` 2.10.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |
 |---|---|
@@ -535,7 +535,7 @@ packaging/           the driver manifest template
 ## 🛠️ Building and testing
 
 Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.11+. The Chargewire
-driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.2.0
+driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.2.9
 in `go/go.mod`.
 
 ```bash

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.4.8] - 2026-11-09
+
+Tested with Hardcharger 2.10.0, on chargewire-adbc 2.2.9.
+
 ### Changed
 
 - **On chargewire-adbc 2.2.9**, which now gives the three ADBC statuses 2.4.6 added here itself:
