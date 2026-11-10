@@ -14,9 +14,10 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/memory"
 )
 
-// The statuses conformance.go gives (the ADBC Driver Foundry's validation
-// suite checks them too, in validation/), each next to the case that must keep
-// its own status.
+// The ADBC statuses the Chargewire driver gives since chargewire-adbc 2.2.9
+// (this driver had them in its own wrapper before), checked through this
+// driver; the ADBC Driver Foundry's validation suite checks them too, in
+// validation/. Each is next to the case that must keep its own status.
 
 func TestIntegrationUnknownDatabaseOptionAfterOpenIsNotImplemented(t *testing.T) {
 	db, _, err := open(t, shared, nil)
