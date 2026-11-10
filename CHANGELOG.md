@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **On chargewire-adbc 2.2.9**, which now gives the three ADBC statuses 2.4.6 added here itself:
+  an option the driver doesn't know, set on a database after its first connection, is
+  `NOT_IMPLEMENTED`; making a catalog or schema that doesn't exist current is `NOT_FOUND`; an
+  append (or `create_append`) with a column the table doesn't have is `ALREADY_EXISTS`. This
+  driver's own copies (`go/hardcharger/conformance.go` and its hooks in `driver.go`) are gone;
+  the behavior is unchanged, and the same tests and the ADBC validation suite check it.
+- **Dependencies**: chargewire-adbc 2.2.9 (its shared library also exports only `Adbc*` and its
+  macOS wheels say macOS 13, as this driver's have since 2.4.7 and 2.4.6).
+
 ## [2.4.7] - 2026-11-09
 
 Tested with Hardcharger 2.10.0, on chargewire-adbc 2.2.8.
