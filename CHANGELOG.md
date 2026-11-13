@@ -10,6 +10,48 @@ All notable changes to this project are documented here. The format follows
 
 - **CI**: a change that touches only documentation (`*.md`, `docs/`, `LICENSE`, `NOTICE`) skips the build and test jobs, and one job, `CI result`, reports on every run and is the only required check. The glibc-2.28 install check retries `dnf install` with fresh metadata, so a mirror serving a broken `repomd.xml` can't fail a build.
 - **CI**: the validation suite's server is started directly, so `server.pid` holds its own PID (it held a subshell's, in the wrong directory).
+- **Python 3.10, pyarrow 16 and adbc-driver-manager 1.8 are supported**: the Python package
+  requires Python 3.10 or newer (was 3.11), `pyarrow>=16.0.0` (was 26.0.1) and
+  `adbc-driver-manager>=1.8.0` (was 1.13.0), the same floors as adbc-driver-chargewire. They are
+  the floors of [dlt](https://github.com/dlt-hub/dlt), which supports Python 3.10 to 3.14, so the
+  driver installs wherever dlt does and doesn't force its locked versions up. The wheels were
+  always `py3-none`; only the declared floors kept the package off Python 3.10. What the older
+  versions needed: creating a cursor and `conn.close()` closing the connection's open cursors now
+  work with adbc-driver-manager 1.8.0 too (they relied on 1.9.0 and 1.10.0), and
+  `conn.access_token_expires_at` reads the driver's `…Z` timestamp on Python 3.10, whose
+  `datetime.fromisoformat` doesn't. Connection profiles are the driver manager's own feature from
+  1.11.0: with an older one the driver refuses `profile` and says which version resolves it.
+  Python 3.13 needs pyarrow 18, 3.14 needs pyarrow 22, and 3.15 needs pyarrow 26.0.1 and
+  adbc-driver-manager 1.13.0 (their first wheels for it); pip picks those by itself.
+- **CI** runs the Python suite, unit and live, on Python 3.10 with exactly the lowest versions
+  `pyproject.toml` allows (the job fails if what got installed is not the floors), and on 3.14 and
+  3.15 with the latest. The 3.11 entry is gone: 3.10 is the floor now.
+
+### Fixed
+
+Both need the chargewire-adbc release after 2.2.10 (`chargewire.InitOptionOrder`, and its session
+fix): `go/go.mod` moves to it once it is tagged (RELEASING.md, step 2), and this library does not
+build on 2.2.9.
+
+- **A catalog and a schema given together when connecting name that catalog's schema**:
+  `connect(catalog="lake", db_schema="reports")`, and any ADBC client that sets
+  `adbc.connection.catalog` and `adbc.connection.db_schema` before `AdbcConnectionInit`. The
+  library applied the options set before a connection opens in the order of a Go map, which is
+  random, so most connects set the schema first (32 of 40 in a run against 2.4.9). The schema was
+  then looked up in the server's default catalog: one that only the requested catalog has failed
+  the connect (`NOT_FOUND … No catalog + schema named "memory.reports" found`), and one that the
+  default catalog has too was set there and lost again when the catalog was set, so the connection
+  opened in the requested catalog's `main` without an error. Either option alone was not affected.
+  The options are now applied in the Chargewire driver's fixed order: the catalog, the schema,
+  then the others by name. This library has its own generated entry points, so they changed too
+  (`scripts/patch_generated_exports.py` keeps the change through `make -C go regenerate`, and a
+  unit test fails when it is lost). `db_schema` stays one schema name, never split at a dot; for
+  `db_schema="lake.reports"`, when there is no such schema but `lake` is a catalog, the error says
+  to set the catalog to `lake` and the schema to `reports`.
+- **A session that replaces a lost one opens where the lost one was** after the current schema
+  and then the current catalog were set on a connection: the Chargewire driver replayed the schema
+  set before the catalog, so the replacement opened in another schema, or not at all (its
+  changelog has the details).
 
 ## [2.4.9] - 2026-11-09
 

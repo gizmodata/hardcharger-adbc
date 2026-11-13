@@ -16,7 +16,13 @@ import pytest
 
 from adbc_driver_hardcharger import dbapi as hardcharger
 from adbc_driver_hardcharger import manifest
-from conftest import USERNAME, make_certificates, start_server, stop_server
+from conftest import (
+    DRIVER_MANAGER_HAS_PROFILES,
+    USERNAME,
+    make_certificates,
+    start_server,
+    stop_server,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -51,6 +57,115 @@ def test_select_through_a_hardcharger_uri(conn):
     with conn.cursor() as cur:
         cur.execute(operation="SELECT 42 AS answer, ? AS greeting", parameters=["hello"])
         assert cur.fetch_arrow_table().to_pylist() == [{"answer": 42, "greeting": "hello"}]
+
+
+@pytest.fixture(scope="module")
+def two_catalogs(hc_server):
+    """A second catalog, ``both_kwargs``, with a schema only it has (``reports``) and one the
+    server's default catalog has too (``shared_name``), each with a table ``origin`` that says
+    where it lives."""
+    with (
+        hardcharger.connect(
+            uri=hc_server.uri, username=USERNAME, password=hc_server.password
+        ) as setup,
+        setup.cursor() as cur,
+    ):
+        for statement in (
+            "ATTACH IF NOT EXISTS ':memory:' AS both_kwargs",
+            "CREATE SCHEMA IF NOT EXISTS both_kwargs.reports",
+            "CREATE SCHEMA IF NOT EXISTS both_kwargs.shared_name",
+            "CREATE SCHEMA IF NOT EXISTS shared_name",
+            "CREATE OR REPLACE TABLE both_kwargs.reports.origin AS "
+            "SELECT 'both_kwargs.reports' AS origin",
+            "CREATE OR REPLACE TABLE both_kwargs.shared_name.origin AS "
+            "SELECT 'both_kwargs.shared_name' AS origin",
+            "CREATE OR REPLACE TABLE shared_name.origin AS "
+            "SELECT 'default catalog, shared_name' AS origin",
+        ):
+            cur.execute(operation=statement)
+    return hc_server
+
+
+# Options given to connect() are set before the connection opens, and the library used to apply
+# them in Go's map order: the schema before the catalog in most connects (2.4.9: 32 of 40).
+# Thirty connects each, so the old order cannot pass by luck. The rule and its full tests are
+# chargewire-adbc's (chargewire.InitOptionOrder); these go through hardcharger:// and this
+# library's own generated entry points.
+CONNECTS = 30
+
+
+@pytest.mark.parametrize(
+    ("db_schema", "origin"),
+    [
+        # Only the requested catalog has it: applied first, the schema was looked up in the
+        # default catalog and the connect failed (NOT_FOUND).
+        ("reports", "both_kwargs.reports"),
+        # Both catalogs have it: applied first, it was set in the default catalog and lost
+        # when the catalog was set, so the connection opened in both_kwargs.main, no error.
+        ("shared_name", "both_kwargs.shared_name"),
+    ],
+)
+def test_catalog_and_schema_at_connect_name_that_catalogs_schema(two_catalogs, db_schema, origin):
+    for _ in range(CONNECTS):
+        with hardcharger.connect(
+            uri=two_catalogs.uri,
+            username=USERNAME,
+            password=two_catalogs.password,
+            catalog="both_kwargs",
+            db_schema=db_schema,
+        ) as conn:
+            assert conn.adbc_current_catalog == "both_kwargs"
+            assert conn.adbc_current_db_schema == db_schema
+            with conn.cursor() as cur:
+                cur.execute(operation="SELECT origin FROM origin")
+                assert cur.fetchone() == (origin,)
+
+
+def test_schema_alone_at_connect_names_a_schema_of_the_default_catalog(two_catalogs):
+    with (
+        hardcharger.connect(
+            uri=two_catalogs.uri,
+            username=USERNAME,
+            password=two_catalogs.password,
+            db_schema="shared_name",
+        ) as conn,
+        conn.cursor() as cur,
+    ):
+        cur.execute(operation="SELECT origin FROM origin")
+        assert cur.fetchone() == ("default catalog, shared_name",)
+
+
+def test_a_schema_the_catalog_does_not_have_is_refused_at_connect(two_catalogs):
+    # The positive twin is test_catalog_and_schema_at_connect_name_that_catalogs_schema.
+    with pytest.raises(adbc_driver_manager.ProgrammingError) as caught:
+        hardcharger.connect(
+            uri=two_catalogs.uri,
+            username=USERNAME,
+            password=two_catalogs.password,
+            catalog="both_kwargs",
+            db_schema="no_such_schema",
+        )
+    assert caught.value.status_code == adbc_driver_manager.AdbcStatusCode.NOT_FOUND
+    assert chargewire_code(error=caught.value) == "invalid_option_value"
+    assert '"both_kwargs.no_such_schema"' in str(caught.value)
+
+
+def test_db_schema_is_one_name_never_a_catalog_and_schema_path(two_catalogs):
+    # db_schema="both_kwargs.reports" is not split at the dot (a dot can be part of a schema's
+    # name): it names a schema called `both_kwargs.reports` in the current catalog. There is
+    # none, and the error says how to name the schema `reports` of the catalog `both_kwargs`.
+    with pytest.raises(adbc_driver_manager.ProgrammingError) as caught:
+        hardcharger.connect(
+            uri=two_catalogs.uri,
+            username=USERNAME,
+            password=two_catalogs.password,
+            db_schema="both_kwargs.reports",
+        )
+    assert caught.value.status_code == adbc_driver_manager.AdbcStatusCode.NOT_FOUND
+    assert chargewire_code(error=caught.value) == "invalid_option_value"
+    assert 'set the current catalog to "both_kwargs" and the current schema to "reports"' in str(
+        caught.value
+    )
 
 
 def test_the_server_reports_itself_as_hardcharger(conn):
@@ -568,7 +683,9 @@ def test_the_access_token_is_readable_and_works(lifetime_server):
         left = expires_at - datetime.datetime.now(tz=datetime.timezone.utc)
         assert datetime.timedelta(seconds=590) < left <= datetime.timedelta(seconds=601), left
         text = conn.adbc_connection.get_option(key="adbc.chargewire.auth.access_token_expires_at")
-        assert text.endswith("Z") and datetime.datetime.fromisoformat(text) == expires_at
+        # "Z" as "+00:00": Python 3.10's fromisoformat doesn't read the "Z".
+        assert text.endswith("Z")
+        assert datetime.datetime.fromisoformat(text[:-1] + "+00:00") == expires_at
 
 
 def test_the_access_token_after_a_renewal(tmp_path):
@@ -1255,6 +1372,29 @@ def test_manifest_loads_the_driver_by_name_with_a_hardcharger_uri(hc_server, tmp
         )
 
 
+@pytest.mark.skipif(
+    DRIVER_MANAGER_HAS_PROFILES,
+    reason="this adbc-driver-manager resolves connection profiles "
+    "(test_standard_connection_profile runs)",
+)
+@pytest.mark.parametrize("form", ["name", "uri"])
+def test_a_connection_profile_needs_driver_manager_1_11(tmp_path, monkeypatch, form):
+    """An adbc-driver-manager before 1.11.0 knows no profiles and passes the option to the
+    driver, which says what is needed instead of "Unknown database option"."""
+    manifest.install(directory=tmp_path)
+    monkeypatch.setenv(name="ADBC_DRIVER_PATH", value=str(tmp_path))
+    how = {"profile": "hardcharger_test"} if form == "name" else {"uri": "profile://hc_test"}
+    with pytest.raises(adbc_driver_manager.NotSupportedError) as caught:
+        hardcharger.connect(**how)
+    assert caught.value.status_code == adbc_driver_manager.AdbcStatusCode.NOT_IMPLEMENTED
+    assert "adbc-driver-manager>=1.11.0" in str(caught.value)
+
+
+@pytest.mark.skipif(
+    not DRIVER_MANAGER_HAS_PROFILES,
+    reason="connection profiles are adbc-driver-manager's from 1.11.0 "
+    "(test_a_connection_profile_needs_driver_manager_1_11 runs with an older one)",
+)
 @pytest.mark.parametrize("form", ["name", "uri", "path", "manager"])
 def test_standard_connection_profile(hc_server, tmp_path, monkeypatch, form):
     """A shared profile names the driver, not the Python wheel's absolute library path."""
