@@ -23,9 +23,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import adbc_driver_manager
 import pytest
 
 SERVER_BINARY_ENV = "HARDCHARGER_ADBC_TEST_SERVER_BINARY"
+#: (major, minor) of the installed adbc-driver-manager. Connection profiles are its feature
+#: from 1.11.0; the package's floor is 1.8.0.
+DRIVER_MANAGER = tuple(int(part) for part in adbc_driver_manager.__version__.split(".")[:2])
+DRIVER_MANAGER_HAS_PROFILES = DRIVER_MANAGER >= (1, 11)
 USERNAME = "hc_adbc_test"
 
 

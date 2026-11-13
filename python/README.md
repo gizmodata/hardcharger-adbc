@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://github.com/gizmodata/hardcharger-adbc/actions/workflows/ci.yml"><img src="https://github.com/gizmodata/hardcharger-adbc/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypi.org/project/adbc-driver-hardcharger/"><img src="https://img.shields.io/pypi/v/adbc-driver-hardcharger?logo=pypi" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/adbc-driver-hardcharger/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&amp;logoColor=white" alt="Python 3.11 or later"></a>
+  <a href="https://pypi.org/project/adbc-driver-hardcharger/"><img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&amp;logoColor=white" alt="Python 3.10 or later"></a>
   <a href="https://pypi.org/project/adbc-driver-hardcharger/"><img src="https://img.shields.io/pepy/dt/adbc-driver-hardcharger.svg" alt="PyPI downloads"></a>
   <a href="https://docs.hardcharger.gizmodata.com/clients/python/"><img src="https://img.shields.io/badge/docs-Hardcharger-2563eb.svg" alt="Hardcharger Python client documentation"></a>
   <a href="https://arrow.apache.org/adbc/"><img src="https://img.shields.io/badge/ADBC-1.12-f15a24.svg" alt="ADBC 1.12"></a>
@@ -48,8 +48,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.4.8, compatible with Hardcharger 2.10.0.** Speaks the Chargewire protocol 1.0.0 (as of
-> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.2.9;
+> **Status: 2.5.0, compatible with Hardcharger 2.10.0.** Speaks the Chargewire protocol 1.0.0 (as of
+> Chargewire 2.2.0, with `server_resuming`), built on [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.3.0;
 > tested against `hardcharger-server` 2.10.0, and 2.2.0 for servers from before the rename.
 
 | Package | What it is |
@@ -76,6 +76,16 @@ with hardcharger.connect(uri="hardcharger://localhost?tls=false", username="hard
 The connection and cursor are DB-API 2.0 objects with ADBC's extensions:
 `fetch_arrow_table()`, `fetchall()`, `adbc_ingest()` for bulk loads, `adbc_get_objects()` and
 the rest.
+
+The package needs Python 3.10 or newer, with pyarrow 16.0.0+ and adbc-driver-manager 1.8.0+, which
+pip installs with it.
+
+`catalog=` and `db_schema=` make a catalog and a schema current when connecting. `db_schema` is
+one schema name in `catalog` (in the server's default catalog without it) and is never split at a
+dot, because a dot can be part of a schema's name: for the schema `reports` of the catalog `lake`,
+pass `catalog="lake", db_schema="reports"`. On an open connection, set
+`conn.adbc_current_catalog` first, then `conn.adbc_current_db_schema`: setting the catalog moves
+to that catalog's default schema, as SQL `USE` does.
 
 ### C/C++ (through the ADBC driver manager)
 
@@ -379,7 +389,9 @@ certificate. Python refuses a different value for the same option in `db_kwargs`
 ## 🗂️ ADBC connection profiles
 
 [ADBC connection profiles](https://arrow.apache.org/adbc/current/format/connection_profiles.html)
-store a reusable connection in TOML. The Python wheel requires `adbc-driver-manager >= 1.13.0`.
+store a reusable connection in TOML. Profiles need `adbc-driver-manager >= 1.11.0`, which
+resolves them (the Python package itself works from 1.8.0; with an older driver manager a
+profile is refused with an error that says so).
 The **ADBC driver manager** resolves the profile, expands
 its environment variables and loads the native driver; the Go driver receives the resolved
 options. Install the driver manifest once in each client environment:
@@ -535,8 +547,8 @@ packaging/           the driver manifest template
 
 ## 🛠️ Building and testing
 
-Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.11+. The Chargewire
-driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.2.9
+Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.10+. The Chargewire
+driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.3.0
 in `go/go.mod`.
 
 ```bash

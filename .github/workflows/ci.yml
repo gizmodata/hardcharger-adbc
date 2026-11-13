@@ -4,7 +4,8 @@ name: ci
 # the tagged commit):
 #   - Go: gofmt, vet, unit tests and the live-server suite, with the race detector;
 #   - the C shared library, its exports (only Adbc*, go/internal/checkexports), its glibc ceiling,
-#     and the Python bindings' unit and live tests;
+#     and the Python bindings' unit and live tests, on Python 3.10 with exactly the lowest
+#     dependency versions python/pyproject.toml allows, and on 3.14 and 3.15 with the latest;
 #   - the README's C (through the ADBC driver manager and the manifest) and Go examples, run
 #     against a server on the default port;
 #   - the library and Python unit tests on macOS and Windows;
@@ -118,7 +119,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.11", "3.14"]
+        # 3.10 is the floor, installed with exactly the lowest versions python/pyproject.toml
+        # allows (uv's lowest-direct resolution; the floors are dlt's, see the comments next to
+        # them). 3.14 also runs the Go live suite, the notices check and the README examples.
+        # 3.15 is the newest Python, with the latest versions.
+        include:
+          - python: "3.10"
+            resolution: lowest-direct
+          - python: "3.14"
+            resolution: highest
+          - python: "3.15"
+            resolution: highest
     steps:
       - uses: actions/checkout@v7
       - name: PyPI description mirrors the repository README
@@ -183,14 +194,45 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
-      - name: Python lint and tests (unit and live, against the built library)
+      - name: Install the Python package (${{ matrix.resolution }} versions)
         working-directory: python
         run: |
           uv venv .venv --python "${{ matrix.python }}"
-          uv pip install --python .venv/bin/python -e ".[test,dev]"
+          uv pip install --python .venv/bin/python --resolution "${{ matrix.resolution }}" -e ".[test,dev]"
+          uv pip list --python .venv/bin/python
+      # The lowest entry fails when what got installed is not the floors, so the floors can't
+      # drift from what is tested.
+      - name: What is installed is exactly the floors in pyproject.toml
+        if: matrix.resolution == 'lowest-direct'
+        working-directory: python
+        run: |
+          set -euo pipefail
+          for package in adbc-driver-manager pyarrow; do
+            floor=$(sed -n "s/^ *\"$package>=\([0-9.]*\)\".*/\1/p" pyproject.toml)
+            have=$(uv pip show --python .venv/bin/python "$package" | sed -n 's/^Version: //p')
+            echo "$package: floor ${floor:-none found}, installed ${have:-nothing}"
+            if [ -z "$floor" ] || [ "$floor" != "$have" ]; then
+              echo "::error::$package: pyproject.toml's floor is '${floor}', but '${have}' is installed"
+              exit 1
+            fi
+          done
+          have=$(.venv/bin/python -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+          floor=$(sed -n 's/^requires-python = ">=\([0-9.]*\)".*/\1/p' pyproject.toml)
+          echo "python: floor ${floor:-none found}, running $have"
+          if [ -z "$floor" ] || [ "$floor" != "$have" ]; then
+            echo "::error::requires-python's floor is '${floor}', but this job runs Python $have"
+            exit 1
+          fi
+      # Lint with the latest ruff only: the lowest entry has the oldest ruff the dev extra allows.
+      - name: Python lint
+        if: matrix.resolution == 'highest'
+        working-directory: python
+        run: |
           .venv/bin/ruff check src tests
           .venv/bin/ruff format --check src tests
-          .venv/bin/python -m pytest -v
+      - name: Python tests (unit and live, against the built library)
+        working-directory: python
+        run: .venv/bin/python -m pytest -v -rs
 
       # The README's examples, as written: a server on the default port 31337 with the
       # README's credentials, the driver found by name through the manifest.
