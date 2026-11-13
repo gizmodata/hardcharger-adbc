@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-11-13
+
+### Fixed
+
+- **The Go driver builds without cgo.** A program that imports
+  `github.com/gizmodata/hardcharger-adbc/go/v2/hardcharger` and is built with `CGO_ENABLED=0`, as
+  cross-compiled and statically linked Go programs are (a Grafana backend plugin, a `scratch`
+  container image), failed to compile: `undefined: mallocator.Mallocator`, in the Chargewire
+  driver underneath. Built on chargewire-adbc 2.3.1 (was 2.3.0), which fixes it. Nothing changes
+  for a cgo build, the C shared library or the Python package. Every release so far needed cgo.
+- **CI** builds the Go packages and the example for Linux, macOS and Windows with
+  `CGO_ENABLED=0` and runs the unit tests that way, so this stays true.
+
 ## [2.5.0] - 2026-11-13
 
 ### Changed

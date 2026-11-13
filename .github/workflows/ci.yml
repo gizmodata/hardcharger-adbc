@@ -173,6 +173,22 @@ jobs:
       - name: Go unit tests
         working-directory: go
         run: make test
+      # The Go packages are pure Go: a program that imports them must build with CGO_ENABLED=0
+      # and cross-compile (a Grafana backend plugin is built that way for every platform). Only
+      # the C shared library (pkg/hardcharger) needs cgo. 2.5.0 and earlier did not build
+      # without it (the Chargewire driver named arrow-go's cgo-only allocator).
+      - name: The Go driver and its example build, cross-compile and pass their unit tests without cgo
+        working-directory: go
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          for target in linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64; do
+            echo "== $target"
+            GOOS="${target%/*}" GOARCH="${target#*/}" go build ./hardcharger/ ./examples/...
+          done
+          go vet ./hardcharger/ ./examples/...
+          go test ./hardcharger/
       - name: Third-party notices are current (scripts/third_party_notices.sh)
         if: matrix.python == '3.14'
         run: scripts/third_party_notices.sh --check
