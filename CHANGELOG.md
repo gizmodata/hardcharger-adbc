@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-13
+
 ### Changed
 
 - **CI**: a change that touches only documentation (`*.md`, `docs/`, `LICENSE`, `NOTICE`) skips the build and test jobs, and one job, `CI result`, reports on every run and is the only required check. The glibc-2.28 install check retries `dnf install` with fresh metadata, so a mirror serving a broken `repomd.xml` can't fail a build.
@@ -29,9 +31,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
-Both need the chargewire-adbc release after 2.2.10 (`chargewire.InitOptionOrder`, and its session
-fix): `go/go.mod` moves to it once it is tagged (RELEASING.md, step 2), and this library does not
-build on 2.2.9.
+Built on chargewire-adbc 2.3.0 (was 2.2.9), which both fixes need (`chargewire.InitOptionOrder`,
+and its session fix).
 
 - **A catalog and a schema given together when connecting name that catalog's schema**:
   `connect(catalog="lake", db_schema="reports")`, and any ADBC client that sets
