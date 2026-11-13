@@ -8,7 +8,7 @@ require (
 	github.com/adbc-drivers/driverbase-go/driverbase v0.0.0-20261109034954-869784ceb17f
 	github.com/apache/arrow-adbc/go/adbc v1.13.0
 	github.com/apache/arrow-go/v18 v18.8.0
-	github.com/gizmodata/chargewire-adbc/go/v2 v2.3.0
+	github.com/gizmodata/chargewire-adbc/go/v2 v2.3.1
 	go.uber.org/goleak v1.3.0
 )
 
