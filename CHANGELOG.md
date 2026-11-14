@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Server-confirmed read-only connections through the Chargewire driver, with one-way
+  transitions and no writable fallback when the server does not support the option.
+
 ## [2.5.1] - 2026-11-13
 
 ### Fixed

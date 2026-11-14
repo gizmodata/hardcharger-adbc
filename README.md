@@ -223,6 +223,32 @@ new session fails, the driver ends it rather than use it with the server's defau
 that found the old session gone fails (`StatusIO`, Python `OperationalError`) with the setting
 and the server's reason, and the connection's next request opens and sets up another session.
 
+## 🔒 Read-only connections
+
+Request a server-enforced read-only connection before any session setup:
+
+```python
+from adbc_driver_hardcharger import dbapi
+
+with dbapi.connect(
+    uri=uri, username=username, password=password,
+    conn_kwargs={"adbc.connection.readonly": "true"},
+) as conn:
+    with conn.cursor() as cur:
+        cur.execute(operation="SELECT 42 AS answer")
+        print(cur.fetchone())  # (42,)
+```
+
+Here `uri`, `username` and `password` are your connection details. Go callers use
+`db.Open(hardcharger.WithReadOnly(ctx))`; C callers set `adbc.connection.readonly` to
+`true` before `AdbcConnectionInit`. An existing connection can enable the same option.
+The driver requires server confirmation before tags, settings or queries run. A lazy
+connection confirms on its first operation, including reading its read-only option.
+The restriction is one-way and is requested again for replacement sessions; open a
+separate connection to write. An older server that rejects or ignores the option causes
+an error, with no writable fallback. Ordinary connections retain their existing behavior.
+Read-only adds no permissions and does not sandbox installed extension code.
+
 ## 🐍 Python helpers
 
 ```python

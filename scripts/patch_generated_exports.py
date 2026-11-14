@@ -1,6 +1,6 @@
 """Re-apply this repository's changes to the generated cgo entry points (`make -C go regenerate`).
 
-go/pkg/hardcharger/driver.go comes from driverbase-go's template, with two changes of ours.
+go/pkg/hardcharger/driver.go comes from driverbase-go's template, with changes of ours.
 Each must match the template's text exactly once: when the template changes, this script
 stops, and the change has to be looked at again.
 
@@ -11,6 +11,8 @@ stops, and the change has to be looked at again.
    catalog, so it has to be applied after the catalog: hardcharger.InitOptionOrder, which is the
    Chargewire driver's chargewire.InitOptionOrder, gives that order (chargewire-adbc's
    go/chargewire/init_options.go says what went wrong without it).
+
+3. Read-only is one-way before initialization and reaches Database.Open before any setup.
 """
 
 from pathlib import Path
@@ -22,14 +24,36 @@ CHANGES = [
         "exportRecordBatch(cStream.rdr.RecordBatch(), toCdataArray(array))",
     ),
     (
+        "one-way read-only before connection initialization",
+        "\t\tconn.initArgs[k] = v\n",
+        """		if e := hardcharger.SetInitOption(conn.initArgs, k, v); e != nil {
+			return C.AdbcStatusCode(errToAdbcErr(err, e))
+		}
+""",
+    ),
+    (
+        "read-only in the creation request",
+        "\tc, e := cdb.db.Open(context.Background())\n",
+        """	openCtx, e := hardcharger.ConnectionInitContext(context.Background(), conn.initArgs)
+	if e != nil {
+		return C.AdbcStatusCode(errToAdbcErr(err, e))
+	}
+	c, e := cdb.db.Open(openCtx)
+""",
+    ),
+    (
         "the options set before AdbcConnectionInit (hardcharger.InitOptionOrder)",
         """		for k, v := range conn.initArgs {
 			rawCode := errToAdbcErr(err, conn.cnxn.SetOption(ctx, k, v))
 """,
         """		for _, k := range hardcharger.InitOptionOrder(conn.initArgs) {
+			if k == adbc.OptionKeyReadOnly {
+				continue // already carried in the session's creation request
+			}
 			rawCode := errToAdbcErr(err, conn.cnxn.SetOption(ctx, k, conn.initArgs[k]))
 """,
     ),
+
 ]
 
 driver = Path(__file__).resolve().parents[1] / "go/pkg/hardcharger/driver.go"
