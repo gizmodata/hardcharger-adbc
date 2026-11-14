@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-14
+
+### Added
+
+- Server-confirmed read-only connections through the Chargewire driver, with one-way
+  transitions and no writable fallback when the server does not support the option.
+
+### Changed
+
+- Build on published Chargewire ADBC Go module 2.4.0, verified through the public module proxy.
+
 ## [2.5.1] - 2026-11-13
 
 ### Fixed
