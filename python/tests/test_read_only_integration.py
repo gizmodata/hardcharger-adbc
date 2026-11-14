@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import adbc_driver_manager
 import pytest
-from conftest import USERNAME
 
 from adbc_driver_hardcharger import dbapi
+from conftest import USERNAME
 
 pytestmark = pytest.mark.integration
 KEY = "adbc.connection.readonly"
@@ -37,9 +37,7 @@ def test_read_only_connection_and_write_refusal(hc_server):
 
 
 def test_existing_connection_can_become_read_only(hc_server):
-    with dbapi.connect(
-        uri=hc_server.uri, username=USERNAME, password=hc_server.password
-    ) as conn:
+    with dbapi.connect(uri=hc_server.uri, username=USERNAME, password=hc_server.password) as conn:
         assert conn.adbc_connection.get_option(key=KEY) == "false"
         conn.adbc_connection.set_options(**{KEY: "true"})
         assert conn.adbc_connection.get_option(key=KEY) == "true"

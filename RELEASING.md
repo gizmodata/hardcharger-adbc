@@ -5,7 +5,8 @@ test gate, the shared library for every platform, the wheels, the GitHub Release
 `adbc-driver-hardcharger`), and `go/vX.Y.Z`, which versions the Go module
 `github.com/gizmodata/hardcharger-adbc/go/v2` (v2 requires the `/v2` module/import suffix; it lives in `go/`, so Go's subdirectory-module
 convention applies; `go-module.yml` checks the pair and warms the module proxy). The Python
-package and the Go module share one version line, the server's (2.0.0 with Hardcharger 2.0.0).
+package and the Go module share an independent driver version line. Do not derive their
+version from the Hardcharger server release.
 
 The Go module depends on `github.com/gizmodata/chargewire-adbc/go/v2`, so the generic driver is
 released first.
@@ -20,7 +21,7 @@ released first.
    ```
 
 2. **Move `go/go.mod` to that release** (from a pseudo-version, or from a `replace` of a local
-   checkout), on `main`:
+   checkout), on a release branch:
 
    ```bash
    cd go
@@ -32,17 +33,21 @@ released first.
    (cd go && make test)
    ```
 
-   Commit it ("Build on chargewire-adbc/go/v2 vX.Y.Z"), with a CHANGELOG line, push `main`, and wait
-   for CI (the Go unit and live suites, the Python bindings, the notices check).
+   Commit it ("Build on chargewire-adbc/go/v2 vX.Y.Z"), with a CHANGELOG line, push the branch,
+   and open a pull request. Wait for CI (the Go unit and live suites, the Python bindings,
+   the notices check), then merge through the repository's protected pull-request process.
 3. The version in `python/src/adbc_driver_hardcharger/_version.py` and `CHANGELOG.md`'s
    `## [X.Y.Z] - YYYY-MM-DD` section with today's date, on `main`, green.
-4. Tag the release, then the Go module, on that commit, and push the release tag first:
+4. Fetch the exact landed main commit and verify its tree matches the tested candidate.
+   Tag the release on that commit and push the release tag first:
 
    ```bash
-   sha=$(git rev-parse main)
+   git fetch origin main
+   sha=$(git rev-parse origin/main)
    git tag -a vX.Y.Z -m "hardcharger-adbc X.Y.Z" "$sha"
-   git tag -a go/vX.Y.Z -m "github.com/gizmodata/hardcharger-adbc/go/v2 vX.Y.Z" "$sha"
    git push origin vX.Y.Z
+   # After release.yml succeeds and the release is verified:
+   git tag -a go/vX.Y.Z -m "github.com/gizmodata/hardcharger-adbc/go/v2 vX.Y.Z" "$sha"
    git push origin go/vX.Y.Z
    ```
 
