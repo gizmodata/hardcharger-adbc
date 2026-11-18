@@ -48,7 +48,7 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.6.0, with Hardcharger 2.13.0.** Speaks Chargewire protocol 1.0.0, built on
+> **Status: 2.6.1, with Hardcharger 2.13.0.** Speaks Chargewire protocol 1.0.0, built on
 > [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.4.0. Read-only connections require
 > Hardcharger 2.13.0 or newer; ordinary connections remain compatible with older servers,
 > including 2.2.0 from before the protocol rename.
