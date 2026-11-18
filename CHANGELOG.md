@@ -20,6 +20,16 @@ All notable changes to this project are documented here. The format follows
   the layout the installer unpacks; `file` must report the platform's format and architecture),
   five wheels, and the sums. Neither the GitHub Release nor PyPI publishes unless it passes.
 
+### Changed
+
+- **The PyPI description is a Python page of its own** (`python/README.md`): installing, the
+  quick start, `connect()`'s arguments, tags and settings, read-only connections, browser,
+  client certificate and token sign-in, the TLS server name, connection profiles, attaching to a
+  session, the access token and `python -m adbc_driver_hardcharger.manifest`, every example run
+  against a server. Other languages and the full option reference stay in the repository
+  README, which it links to. `scripts/sync_python_readme.sh` and CI's check that the two files
+  match are gone.
+
 ### Fixed
 
 - The manifest template's (`packaging/hardcharger.toml.in`) Windows paths had a doubled

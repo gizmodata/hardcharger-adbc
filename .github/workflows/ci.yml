@@ -132,8 +132,6 @@ jobs:
             resolution: highest
     steps:
       - uses: actions/checkout@v7
-      - name: PyPI description mirrors the repository README
-        run: scripts/sync_python_readme.sh --check
       - uses: actions/setup-go@v7
         with:
           go-version-file: go/go.mod
