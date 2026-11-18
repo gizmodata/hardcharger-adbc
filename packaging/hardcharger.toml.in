@@ -1,8 +1,9 @@
 # ADBC driver manifest for Hardcharger: `driver = "hardcharger"` in any ADBC driver manager
 # (C/C++, Go, R, Rust, Python).
 #
-# Replace @PREFIX@ with the directory holding libadbc_driver_hardcharger (from a release tarball,
-# or the adbc-driver-hardcharger wheel) and @VERSION@ with its version, then install it as
+# Replace @PREFIX@ with the absolute path (a driver manager takes it as is) of the directory
+# holding libadbc_driver_hardcharger (from a release tarball, or the adbc-driver-hardcharger
+# wheel) and @VERSION@ with its version, then install it as
 # `hardcharger.toml` into
 #   Linux:   ~/.config/adbc/drivers/
 #   macOS:   ~/Library/Application Support/ADBC/Drivers/
@@ -32,5 +33,6 @@ linux_amd64 = '@PREFIX@/libadbc_driver_hardcharger.so'
 linux_arm64 = '@PREFIX@/libadbc_driver_hardcharger.so'
 macos_amd64 = '@PREFIX@/libadbc_driver_hardcharger.dylib'
 macos_arm64 = '@PREFIX@/libadbc_driver_hardcharger.dylib'
-windows_amd64 = '@PREFIX@\\libadbc_driver_hardcharger.dll'
-windows_arm64 = '@PREFIX@\\libadbc_driver_hardcharger.dll'
+# Single-quoted TOML strings are literal: one backslash is one backslash.
+windows_amd64 = '@PREFIX@\libadbc_driver_hardcharger.dll'
+windows_arm64 = '@PREFIX@\libadbc_driver_hardcharger.dll'

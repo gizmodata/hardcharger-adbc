@@ -37,8 +37,12 @@ released first.
    and open a pull request. Wait for CI (the Go unit and live suites, the Python bindings,
    the notices check), then merge through the repository's protected pull-request process.
 3. The version in `python/src/adbc_driver_hardcharger/_version.py` and `CHANGELOG.md`'s
-   `## [X.Y.Z] - YYYY-MM-DD` section with today's date, on `main`, green.
-4. Fetch the exact landed main commit and verify its tree matches the tested candidate.
+   `## [X.Y.Z] - YYYY-MM-DD` section with today's date, on `main`, green. Before merging, run
+   `release.yml` on the release branch (`gh workflow run release.yml --ref <branch>`) and wait for
+   every job to pass: a dispatch runs everything a tag runs except the GitHub Release and PyPI, so
+   a failure costs no tag.
+4. Fetch the exact landed main commit and verify its tree matches the tested candidate
+   (`git rev-parse origin/main^{tree}` equals the dispatched commit's).
    Tag the release on that commit and push the release tag first:
 
    ```bash
@@ -60,4 +64,13 @@ released first.
    curl -sS https://pypi.org/pypi/adbc-driver-hardcharger/json | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])'
    gh release view vX.Y.Z -R gizmodata/hardcharger-adbc --json assets --jq '.assets[].name'
    GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go list -m github.com/gizmodata/hardcharger-adbc/go/v2@vX.Y.Z
+   ```
+
+   The release has 12 assets: six library archives, five wheels and `SHA256SUMS` (the
+   installer at [gizmodata/adbc-install](https://github.com/gizmodata/adbc-install) checks an
+   archive against it before installing). Download them all and verify the sums:
+
+   ```bash
+   d=$(mktemp -d); gh release download vX.Y.Z -R gizmodata/hardcharger-adbc -D "$d"
+   (cd "$d" && sha256sum -c SHA256SUMS && test "$(wc -l < SHA256SUMS)" -eq 11)
    ```

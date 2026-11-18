@@ -6,6 +6,37 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-11-18
+
+### Added
+
+- **`SHA256SUMS` in every release**: the SHA-256 of each library archive and wheel, for the ADBC
+  driver installer ([gizmodata/adbc-install](https://github.com/gizmodata/adbc-install), one
+  installer for every GizmoData driver), which refuses an archive whose checksum differs. Verify
+  a download with `sha256sum -c SHA256SUMS`.
+- **The release checks its files before publishing** (`scripts/release_files.sh`, also on a
+  dispatched run): six library archives, each unpacking to one folder of its own name with that
+  platform's library in it (`libadbc_driver_hardcharger-vX.Y.Z-<platform>/libadbc_driver_hardcharger.<so|dylib|dll>`,
+  the layout the installer unpacks; `file` must report the platform's format and architecture),
+  five wheels, and the sums. Neither the GitHub Release nor PyPI publishes unless it passes.
+
+### Changed
+
+- **The PyPI description is a Python page of its own** (`python/README.md`): installing, the
+  quick start, `connect()`'s arguments, tags and settings, read-only connections, browser,
+  client certificate and token sign-in, the TLS server name, connection profiles, attaching to a
+  session, the access token and `python -m adbc_driver_hardcharger.manifest`, every example run
+  against a server. Other languages and the full option reference stay in the repository
+  README, which it links to. `scripts/sync_python_readme.sh` and CI's check that the two files
+  match are gone.
+
+### Fixed
+
+- The manifest template's (`packaging/hardcharger.toml.in`) Windows paths had a doubled
+  backslash: `'@PREFIX@\\libadbc_driver_hardcharger.dll'` is a literal TOML string, so both
+  backslashes stay. It also says the library's directory must be an absolute path (a driver
+  manager takes it as is). `python -m adbc_driver_hardcharger.manifest` was not affected.
+
 ## [2.6.0] - 2026-11-14
 
 ### Added

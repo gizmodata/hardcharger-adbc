@@ -48,7 +48,7 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.6.0, with Hardcharger 2.13.0.** Speaks Chargewire protocol 1.0.0, built on
+> **Status: 2.6.1, with Hardcharger 2.13.0.** Speaks Chargewire protocol 1.0.0, built on
 > [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.4.0. Read-only connections require
 > Hardcharger 2.13.0 or newer; ordinary connections remain compatible with older servers,
 > including 2.2.0 from before the protocol rename.
@@ -606,8 +606,8 @@ Releases follow [semantic versioning](https://semver.org) and [CHANGELOG.md](htt
 Pushing a `vX.Y.Z` tag runs every suite on the tagged commit, then builds the library for Linux
 amd64/arm64 (glibc 2.17; installed and loaded on Oracle Linux 8), macOS arm64/amd64 (macOS 13 or later, as Go 1.27 requires) and Windows
 amd64/arm64, wheels for all of them but Windows arm64 (pyarrow and adbc-driver-manager publish
-no wheels there), a GitHub Release with the libraries, wheels and manifest template, and PyPI
-from the `pypi` environment (trusted publishing, after an approval). Before tagging: set
+no wheels there), a GitHub Release with the libraries (each with the manifest template), the
+wheels and their `SHA256SUMS`, and PyPI from the `pypi` environment (trusted publishing). Before tagging: set
 `__version__` in `python/src/adbc_driver_hardcharger/_version.py`, move `[Unreleased]` into a
 dated section, and regenerate `THIRD_PARTY_NOTICES` if a Go dependency moved
 (`scripts/third_party_notices.sh`; CI checks it).
