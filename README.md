@@ -59,7 +59,8 @@ every language at once:
 | `pip install hardcharger` | the Hardcharger **server**, started from Python |
 | `pip install "hardcharger[adbc]"` | both |
 | `go get github.com/gizmodata/hardcharger-adbc/go/v2` | the Go package (versioned by `go/vX.Y.Z` tags, one per release, on the release's commit) |
-| [Releases](https://github.com/gizmodata/hardcharger-adbc/releases) | the library and the manifest template, for C/C++, R, Rust, ... |
+| `curl https://install.adbc.gizmodata.com/hardcharger \| sh` | the library and its driver manifest, for C/C++, R, Rust, ... (see [Driver manifest](#-driver-manifest)) |
+| [Releases](https://github.com/gizmodata/hardcharger-adbc/releases) | the library and the manifest template |
 
 ## 🚀 Quick start
 
@@ -555,8 +556,24 @@ python -m adbc_driver_hardcharger.manifest          # for this user, pointing at
 python -m adbc_driver_hardcharger.manifest --print  # or print it
 ```
 
-Without Python, fill in [packaging/hardcharger.toml.in](https://github.com/gizmodata/hardcharger-adbc/blob/main/packaging/hardcharger.toml.in) with the
-directory of the library from a [release](https://github.com/gizmodata/hardcharger-adbc/releases)
+Without Python, one line installs the latest release's library and its manifest:
+
+```bash
+# Linux, macOS
+curl https://install.adbc.gizmodata.com/hardcharger | sh
+```
+
+```powershell
+# Windows (PowerShell 5.1 or 7)
+irm https://install.adbc.gizmodata.com/hardcharger.ps1 | iex
+```
+
+It checks the library against the release's `SHA256SUMS` before installing it, into the per-user
+directory the driver managers search. A version, the system-wide directory, uninstalling and the
+other options: [gizmodata/adbc-install](https://github.com/gizmodata/adbc-install).
+
+By hand: fill in [packaging/hardcharger.toml.in](https://github.com/gizmodata/hardcharger-adbc/blob/main/packaging/hardcharger.toml.in) with the
+absolute path of the directory holding the library from a [release](https://github.com/gizmodata/hardcharger-adbc/releases)
 tarball, and install it as `hardcharger.toml` in `~/.config/adbc/drivers/` (Linux),
 `~/Library/Application Support/ADBC/Drivers/` (macOS), `%LOCALAPPDATA%\ADBC\Drivers\`
 (Windows), or a directory on `ADBC_DRIVER_PATH`.
