@@ -13,6 +13,10 @@ stops, and the change has to be looked at again.
    go/chargewire/init_options.go says what went wrong without it).
 
 3. Read-only is one-way before initialization and reaches Database.Open before any setup.
+
+4. No forced garbage collection in AdbcStatementRelease and AdbcArrayStreamRelease: the
+   template runs runtime.GC() in both, two full collections per statement (about 0.5 ms of a
+   1 ms SELECT 1 through the C ABI). AdbcConnectionRelease and AdbcDatabaseRelease keep theirs.
 """
 
 from pathlib import Path
@@ -53,7 +57,42 @@ CHANGES = [
 			rawCode := errToAdbcErr(err, conn.cnxn.SetOption(ctx, k, conn.initArgs[k]))
 """,
     ),
-
+    (
+        "no forced GC in AdbcArrayStreamRelease",
+        """		C.free(unsafe.Pointer(cStream.adbcErr))
+	}
+	runtime.GC()
+}
+""",
+        """		C.free(unsafe.Pointer(cStream.adbcErr))
+	}
+	// No runtime.GC() here: see AdbcStatementRelease.
+}
+""",
+    ),
+    (
+        "no forced GC in AdbcStatementRelease",
+        """		st.stmt = nil
+		// manually trigger GC for two reasons:
+		//  1. ASAN expects the release callback to be called before
+		//     the process ends, but GC is not deterministic. So by manually
+		//     triggering the GC we ensure the release callback gets called.
+		//  2. Creates deterministic GC behavior by all Release functions
+		//     triggering a garbage collection
+		runtime.GC()
+""",
+        """		st.stmt = nil
+		// The template forces a full garbage collection here and in
+		// AdbcArrayStreamRelease, so that release callbacks run before the
+		// process ends (for ASAN). That is two collections per statement,
+		// together about half a millisecond, which a loop of small queries
+		// pays on every statement. The Go runtime collects by itself, Arrow data
+		// handed across the C ABI is released by its own callbacks, and
+		// AdbcConnectionRelease and AdbcDatabaseRelease still collect, so
+		// everything is released before a process that closes its
+		// connection ends.
+""",
+    ),
 ]
 
 driver = Path(__file__).resolve().parents[1] / "go/pkg/hardcharger/driver.go"
