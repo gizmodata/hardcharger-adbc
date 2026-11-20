@@ -56,6 +56,13 @@ All notable changes to this project are documented here. The format follows
   bad escape (`invalid URL escape "%ss"`), which can be part of a password. It now describes the
   problem only (`invalid uri: a % that doesn't start a two-digit hex escape (write a literal % as
   %25)`).
+- **A TLS option the driver refused no longer steers a later browser sign-in**: an option set after
+  the first connection opened (which the Chargewire driver refuses) was still recorded where a
+  browser sign-in and the shared sign-in's key read the TLS options; it is recorded only once
+  accepted.
+- **Errors name the key the caller wrote** (`hardcharger.retry.max_attempts`, an old name), not
+  the Chargewire driver's name it is passed on under; a misspelt `hardcharger.*` key on a
+  connection is refused as unknown, not as "a database option".
 - On Windows, the driver manifest that `python -m adbc_driver_hardcharger.manifest` writes also names the library under `windows_<arch>_mingw`, the key R's `adbcdrivermanager` (built with MinGW) looks up, so loading the driver by name from R on Windows works ([gizmodata/adbc-install#10](https://github.com/gizmodata/adbc-install/issues/10)). Run it again to update an existing manifest.
 
 ## [2.6.2] - 2026-11-19

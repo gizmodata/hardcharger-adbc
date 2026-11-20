@@ -109,8 +109,10 @@ def current_key(key: str) -> tuple[str, int]:
     for prefix in _OLD_CHARGEWIRE_PREFIXES:
         if key.startswith(prefix):
             rest = key[len(prefix) :]
-            if rest in _CHARGEWIRE_RENAMED:
-                renamed = _CHARGEWIRE_RENAMED[rest]
+            # The old prefix with either the old part after it or the current one
+            # (adbc.chargewire.retry.resume_timeout_seconds), as the driver reads them.
+            renamed = _CHARGEWIRE_RENAMED.get(rest, rest if rest in _CHARGEWIRE_CURRENT else None)
+            if renamed is not None:
                 if renamed in _CHARGEWIRE_ONLY:
                     current = _CHARGEWIRE_PREFIX + renamed
                     _warn(old=key, current=current)

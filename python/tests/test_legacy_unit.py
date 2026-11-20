@@ -102,6 +102,12 @@ class TestStyleGuideNames:
             ("adbc.chargewire.ipc_compression", "hardcharger.ipc.compression"),
             ("adbc.chargewire.tls.root_certs", "hardcharger.tls.root_certs"),
             ("adbc.warp.statement.result_order", "hardcharger.query.result_order"),
+            # The old prefix with the current part after it, as the driver reads it.
+            (
+                "adbc.chargewire.retry.resume_timeout_seconds",
+                "hardcharger.retry.resume_timeout_seconds",
+            ),
+            ("adbc.chargewire.query.timeout_seconds", "hardcharger.query.timeout_seconds"),
             # Hardcharger has its own auth.type and oauth.* (other values): the Chargewire
             # driver's keep its name.
             ("adbc.chargewire.auth.type", "chargewire.auth.type"),
@@ -193,3 +199,16 @@ def test_the_library_warns_on_stderr_once_and_never_prints_values():
         '[hardcharger] option "adbc.hardcharger.query_tag" is deprecated; '
         'use "hardcharger.session.query_tag"',
     ]
+
+
+@pytest.mark.usefixtures("fresh_warnings")
+@patch(_PATCH_CLS)
+@patch(_PATCH_CONN)
+@patch(_PATCH_DB)
+def test_connect_checks_see_every_old_spelling(mock_db, mock_conn, mock_cls):
+    with pytest.raises(expected_exception=ValueError, match="disagree"):
+        hardcharger.connect(
+            uri="hardcharger://h",
+            resume_timeout=5,
+            db_kwargs={"adbc.chargewire.retry.resume_timeout_seconds": "9"},
+        )

@@ -3,10 +3,12 @@
 package hardcharger
 
 import (
+	"errors"
 	"maps"
 	"slices"
 	"strings"
 
+	"github.com/apache/arrow-adbc/go/adbc"
 	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
@@ -104,16 +106,39 @@ func currentOptionKeyRanked(key string) (string, int) {
 // several keys name one option, Hardcharger's spelling wins over the
 // Chargewire driver's, and either over an old name, whatever the map's order.
 func currentOptions(options map[string]string) map[string]string {
+	out, _ := currentOptionsSpelled(options)
+	return out
+}
+
+// currentOptionsSpelled is currentOptions, also giving the key the caller
+// wrote for each option kept, so errors can name it.
+func currentOptionsSpelled(options map[string]string) (map[string]string, map[string]string) {
 	out := make(map[string]string, len(options))
+	spelled := make(map[string]string, len(options))
 	rank := make(map[string]int, len(options))
 	for _, key := range slices.Sorted(maps.Keys(options)) {
 		current, r := currentOptionKeyRanked(key)
 		if previous, seen := rank[current]; seen && previous <= r {
 			continue
 		}
-		out[current], rank[current] = options[key], r
+		out[current], rank[current], spelled[current] = options[key], r, key
 	}
-	return out
+	return out, spelled
+}
+
+// asSpelled returns err with the name this package passed the option on
+// under (chargewire.X) replaced by the key the caller wrote, so the error
+// names what they set.
+func asSpelled(err error, internal, given string) error {
+	if err == nil || internal == given {
+		return err
+	}
+	var adbcErr adbc.Error
+	if errors.As(err, &adbcErr) {
+		adbcErr.Msg = strings.ReplaceAll(adbcErr.Msg, internal, given)
+		return adbcErr
+	}
+	return err
 }
 
 // ToWarpURI is ToChargewireURI under its name from before the rename, and

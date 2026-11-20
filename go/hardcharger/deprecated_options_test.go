@@ -5,6 +5,7 @@ package hardcharger
 import (
 	"bytes"
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -195,5 +196,69 @@ func TestUnparseableURIIsNotEchoed(t *testing.T) {
 				t.Errorf("the error for %q quotes %q: %v", uri, secret, err)
 			}
 		}
+	}
+}
+
+// Options set before a connection is initialized follow the same "which name
+// wins" rule as a database's: the name a database keeps is applied last.
+func TestInitOptionOrderMatchesDatabasePrecedence(t *testing.T) {
+	captureDeprecations(t)
+	for _, names := range [][]string{
+		{"adbc.warp.ingest.parts", "adbc.hardcharger.ingest.parts", "adbc.chargewire.ingest.parts", chargewire.OptionIngestParts, OptionIngestParts},
+		{"adbc.hardcharger.ingest.parts", chargewire.OptionIngestParts},
+		{"adbc.hardcharger.ingest.parts", "adbc.chargewire.ingest.parts"},
+	} {
+		options := map[string]string{}
+		for i, name := range names {
+			options[name] = strconv.Itoa(i + 1)
+		}
+		want := currentOptions(options)[chargewire.OptionIngestParts]
+		for range 50 {
+			order := InitOptionOrder(options)
+			if last := options[order[len(order)-1]]; last != want {
+				t.Fatalf("%v: applied last %s=%s, but a database keeps %s", names, order[len(order)-1], last, want)
+			}
+		}
+	}
+}
+
+// A connection refuses an unknown hardcharger.* key as unknown (not "a
+// database option"), and errors name the key the caller wrote.
+func TestConnectionOptionErrorsNameTheCallersKey(t *testing.T) {
+	captureDeprecations(t)
+	for _, tc := range []struct {
+		key    string
+		status adbc.Status
+		text   string
+	}{
+		{"hardcharger.query.timeout_second", adbc.StatusNotImplemented, "unknown option hardcharger.query.timeout_second"},
+		{OptionOAuthBrowser, adbc.StatusInvalidArgument, OptionOAuthBrowser + " is a database option"},
+	} {
+		_, _, err := connectionSetting(currentOptionKey(tc.key))
+		wantStatus(t, asSpelled(err, currentOptionKey(tc.key), tc.key), tc.status, tc.text)
+	}
+	err := asSpelled(adbc.Error{Code: adbc.StatusNotImplemented, Msg: "[chargewire] Unknown connection option 'chargewire.retry.resume_timeout_seconds'"},
+		chargewire.OptionResumeTimeout, "adbc.hardcharger.resume_timeout")
+	wantStatus(t, err, adbc.StatusNotImplemented, "'adbc.hardcharger.resume_timeout'")
+}
+
+// An option the Chargewire driver refuses is not recorded where a browser
+// sign-in and the shared sign-in's key read the TLS options.
+func TestRefusedOptionIsNotRecorded(t *testing.T) {
+	db, err := newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", "hardcharger.tls.skip_verify": "false"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetOption(context.Background(), "hardcharger.tls.skip_verify", "maybe"); err == nil {
+		t.Fatal("an invalid skip_verify was accepted")
+	} else if !strings.Contains(err.Error(), "hardcharger.tls.skip_verify") {
+		t.Errorf("the error names %q, not the caller's key", err)
+	}
+	if got := db.chargewireOptions[chargewire.OptionTLSSkipVerify]; got != "false" {
+		t.Errorf("recorded skip_verify %q after the Chargewire driver refused it, want false", got)
+	}
+	if _, err := newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", "hardcharger.retry.max_attempts": "zero"}); err == nil ||
+		!strings.Contains(err.Error(), "hardcharger.retry.max_attempts") {
+		t.Errorf("creating a database with a bad value names %v, not the caller's key", err)
 	}
 }

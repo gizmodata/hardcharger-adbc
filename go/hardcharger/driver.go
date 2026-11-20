@@ -65,15 +65,23 @@ type driverImpl struct {
 // opens.
 func (d *driverImpl) NewDatabaseWithContext(ctx context.Context, opts map[string]string) (adbc.DatabaseWithContext, error) {
 	db := &database{cfg: newConfig(), chargewireOptions: map[string]string{}}
-	chargewireOpts, err := db.take(opts)
+	taken, err := db.take(opts)
 	if err != nil {
 		return nil, err
 	}
-	inner, err := d.inner.NewDatabaseWithContext(ctx, chargewireOpts)
+	inner, err := d.inner.NewDatabaseWithContext(ctx, taken.options)
 	if err != nil {
+		for internal, given := range taken.spelled {
+			err = asSpelled(err, internal, given)
+		}
 		return nil, err
 	}
 	db.Database = inner.(driverbase.Database)
+	db.mu.Lock()
+	for key, value := range taken.passed {
+		db.chargewireOptions[key] = value
+	}
+	db.mu.Unlock()
 	return db, nil
 }
 
@@ -94,12 +102,20 @@ type database struct {
 	sharedToken string
 }
 
+// taken is what take hands on: the options for the Chargewire driver, those
+// of them the caller set (to record in chargewireOptions once the Chargewire
+// driver has accepted them), and the key the caller wrote for each.
+type taken struct {
+	options, passed, spelled map[string]string
+}
+
 // take records Hardcharger's options and translates the URI; it returns the
 // options for the Chargewire driver.
-func (db *database) take(opts map[string]string) (map[string]string, error) {
+func (db *database) take(opts map[string]string) (taken, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	opts = currentOptions(opts)
+	opts, spelled := currentOptionsSpelled(opts)
+	passed := map[string]string{}
 	chargewireOpts := make(map[string]string, len(opts))
 	// A map has no order: apply settings in a stable (sorted) one.
 	keys := make([]string, 0, len(opts))
@@ -112,26 +128,30 @@ func (db *database) take(opts map[string]string) (map[string]string, error) {
 		switch {
 		case key == OptionAuthType:
 			if err := db.cfg.set(key, value); err != nil {
-				return nil, err
+				return taken{}, err
 			}
 			chargewireOpts[chargewireAuthType] = chargewireAuthTypeFor(db.cfg.authType)
 		case isHardchargerOption(key):
 			if err := db.cfg.set(key, value); err != nil {
-				return nil, err
+				return taken{}, err
 			}
 		case key == adbc.OptionKeyURI:
 			translated, err := ToChargewireURI(value)
 			if err != nil {
-				return nil, err
+				return taken{}, err
 			}
 			db.uri, db.chargewireURI = value, translated
 			chargewireOpts[key] = translated
 		default:
+			// Recorded in chargewireOptions (which a browser sign-in and the
+			// shared sign-in's key read) only once the Chargewire driver has
+			// accepted it: an option it refuses (a TLS option set after the
+			// first connection opened) must not steer a later sign-in.
 			chargewireOpts[key] = value
-			db.chargewireOptions[key] = value
+			passed[key] = value
 		}
 	}
-	return chargewireOpts, nil
+	return taken{options: chargewireOpts, passed: passed, spelled: spelled}, nil
 }
 
 func (db *database) SetOption(ctx context.Context, key, value string) error {
@@ -139,16 +159,21 @@ func (db *database) SetOption(ctx context.Context, key, value string) error {
 }
 
 func (db *database) SetOptions(ctx context.Context, opts map[string]string) error {
-	chargewireOpts, err := db.take(opts)
+	taken, err := db.take(opts)
 	if err != nil {
 		return err
 	}
 	// One at a time through SetOption: driverbase's SetOptions is
 	// DatabaseImplBase's, which knows none of the Chargewire driver's options.
-	keys := slices.Sorted(maps.Keys(chargewireOpts))
+	keys := slices.Sorted(maps.Keys(taken.options))
 	for _, key := range keys {
-		if err := db.Database.SetOption(ctx, key, chargewireOpts[key]); err != nil {
-			return err
+		if err := db.Database.SetOption(ctx, key, taken.options[key]); err != nil {
+			return asSpelled(err, key, taken.spelled[key])
+		}
+		if value, ok := taken.passed[key]; ok {
+			db.mu.Lock()
+			db.chargewireOptions[key] = value
+			db.mu.Unlock()
 		}
 	}
 	return nil
@@ -315,14 +340,14 @@ type connection struct {
 	attached bool
 }
 
-func (c *connection) SetOption(ctx context.Context, key, value string) error {
-	key = currentOptionKey(key)
+func (c *connection) SetOption(ctx context.Context, given, value string) error {
+	key := currentOptionKey(given)
 	name, global, err := connectionSetting(key)
 	if err != nil {
-		return err
+		return asSpelled(err, key, given)
 	}
 	if name == "" {
-		return c.Connection.SetOption(ctx, key, value)
+		return asSpelled(c.Connection.SetOption(ctx, key, value), key, given)
 	}
 	if !global && !c.attached && !c.setup.applied.Load() {
 		// The connection's session isn't open yet (a stopped server: it
@@ -346,14 +371,15 @@ func (c *connection) SetOption(ctx context.Context, key, value string) error {
 	return nil
 }
 
-func (c *connection) GetOption(ctx context.Context, key string) (string, error) {
-	key = currentOptionKey(key)
+func (c *connection) GetOption(ctx context.Context, given string) (string, error) {
+	key := currentOptionKey(given)
 	name, _, err := connectionSetting(key)
 	if err != nil {
-		return "", err
+		return "", asSpelled(err, key, given)
 	}
 	if name == "" {
-		return c.Connection.GetOption(ctx, key)
+		value, err := c.Connection.GetOption(ctx, key)
+		return value, asSpelled(err, key, given)
 	}
 	return c.setting(ctx, name)
 }
@@ -372,8 +398,10 @@ func connectionSetting(key string) (name string, global bool, err error) {
 	case strings.HasPrefix(key, OptionGlobalSettingPrefix):
 		name, err = settingName(strings.TrimPrefix(key, OptionGlobalSettingPrefix))
 		return name, true, err
-	case isHardchargerOption(key):
+	case isOwnOption(key):
 		return "", false, invalidArgument("%s is a database option: set it before connecting", key)
+	case isHardchargerOption(key):
+		return "", false, adbc.Error{Code: adbc.StatusNotImplemented, Msg: "[hardcharger] unknown option " + key}
 	}
 	return "", false, nil
 }

@@ -431,7 +431,7 @@ class TestLibrary:
                     "hardcharger.auth.subject_token": "eyJ.idp.jwt",
                 },
             )
-        assert "do not also set chargewire.auth.subject_token" in str(error.value)
+        assert "do not also set hardcharger.auth.subject_token" in str(error.value)
 
     def test_tls_server_name_reaches_the_chargewire_driver(self):
         with adbc_driver_manager.AdbcDatabase(

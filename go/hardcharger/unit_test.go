@@ -509,7 +509,8 @@ func TestIngestPartsIsTheChargewireOption(t *testing.T) {
 	}
 	// The Chargewire driver validates it, under either name; the twin is above.
 	_, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionIngestParts: "none"})
-	wantStatus(t, err, adbc.StatusInvalidArgument, chargewire.OptionIngestParts)
+	// The error names the key the caller wrote.
+	wantStatus(t, err, adbc.StatusInvalidArgument, "for option "+OptionIngestParts+":")
 	// Unset, it is the Chargewire driver's default: auto (16 parts on a near link, 32 on a far one).
 	db, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h"})
 	if err != nil {
@@ -616,7 +617,8 @@ func TestResumeTimeoutIsTheChargewireOption(t *testing.T) {
 	}
 	// The Chargewire driver validates it, under either name; the twin is above.
 	_, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionResumeTimeout: "soon"})
-	wantStatus(t, err, adbc.StatusInvalidArgument, chargewire.OptionResumeTimeout)
+	// The error names the key the caller wrote.
+	wantStatus(t, err, adbc.StatusInvalidArgument, "for option "+OptionResumeTimeout+":")
 	// Unset, it is the Chargewire driver's default, 600 s.
 	db, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h"})
 	if err != nil {
