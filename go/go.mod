@@ -50,5 +50,3 @@ require (
 	google.golang.org/grpc v1.85.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
-
-replace github.com/gizmodata/chargewire-adbc/go/v2 => ../../chargewire-adbc-wt-deps/go
