@@ -49,7 +49,7 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.7.0, with Hardcharger 2.13.1.** Speaks Chargewire protocol 1.0.0, built on
+> **Status: 2.7.1, with Hardcharger 2.13.1.** Speaks Chargewire protocol 1.0.0, built on
 > [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.5.0. Read-only connections require
 > Hardcharger 2.13.0 or newer; ordinary connections remain compatible with older servers,
 > including 2.2.0 from before the protocol rename.
@@ -253,12 +253,16 @@ from adbc_driver_hardcharger import dbapi
 
 with dbapi.connect(
     uri=uri, username=username, password=password,
-    conn_kwargs={"adbc.connection.readonly": "true"},
+    read_only=True,
 ) as conn:
     with conn.cursor() as cur:
         cur.execute(operation="SELECT 42 AS answer")
         print(cur.fetchone())  # (42,)
 ```
+
+`read_only=True` sets the ADBC specification's standard option `adbc.connection.readonly`
+(standard options keep the `adbc.` prefix; this driver's own are `hardcharger.*`), which is how
+other languages ask for it and what `conn_kwargs` can still carry.
 
 Here `uri`, `username` and `password` are your connection details. Go callers use
 `db.Open(hardcharger.WithReadOnly(ctx))`; C callers set `adbc.connection.readonly` to

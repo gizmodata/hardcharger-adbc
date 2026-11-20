@@ -143,16 +143,22 @@ Ask the server to enforce read-only before anything runs on the connection (Hard
 or newer):
 
 ```python
+from adbc_driver_hardcharger import dbapi as hardcharger
+
 with hardcharger.connect(
     uri="hardcharger://localhost?tls=false",
     username="hardcharger",
     password="change-me",
-    conn_kwargs={"adbc.connection.readonly": "true"},
+    read_only=True,
 ) as conn:
     with conn.cursor() as cur:
         cur.execute(operation="SELECT 42 AS answer")
         print(cur.fetchone())  # (42,)
 ```
+
+`read_only=True` sets the ADBC specification's standard option `adbc.connection.readonly`
+(standard options keep the `adbc.` prefix; this driver's own are `hardcharger.*`), which is how
+other languages ask for it and what `conn_kwargs` can still carry.
 
 The restriction is one-way; open a separate connection to write. A server that rejects or
 ignores the option is an error, with no writable fallback.
