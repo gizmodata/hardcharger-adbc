@@ -347,6 +347,23 @@ class TestManifest:
         assert "entrypoint = 'AdbcDriverHardchargerInit'" in text
         assert f'{manifest._platform_key()} = "/opt/lib/libadbc_driver_hardcharger.so"' in text
 
+    @pytest.mark.parametrize(
+        ("platform_key", "keys"),
+        [
+            ("windows_amd64", ["windows_amd64", "windows_amd64_mingw"]),
+            ("windows_arm64", ["windows_arm64", "windows_arm64_mingw"]),
+            ("linux_amd64", ["linux_amd64"]),
+            ("macos_arm64", ["macos_arm64"]),
+        ],
+    )
+    def test_driver_shared_keys(self, monkeypatch, platform_key, keys):
+        # R on Windows (adbcdrivermanager, built with MinGW) looks up windows_<arch>_mingw;
+        # Python and other MSVC builds look up windows_<arch>. Both must name the library.
+        monkeypatch.setattr(manifest, "_platform_key", lambda: platform_key)
+        text = manifest.render(library="C:\\lib\\libadbc_driver_hardcharger.dll")
+        shared = text.split("[Driver.shared]\n", 1)[1].splitlines()
+        assert shared == [f'{key} = "C:\\\\lib\\\\libadbc_driver_hardcharger.dll"' for key in keys]
+
     def test_install_points_at_the_bundled_library(self, tmp_path):
         path = manifest.install(directory=tmp_path)
         assert path == tmp_path / "hardcharger.toml"

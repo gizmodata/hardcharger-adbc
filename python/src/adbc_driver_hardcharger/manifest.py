@@ -36,6 +36,17 @@ def _platform_key() -> str:
     return f"{system}_{arch}"
 
 
+def _shared_keys() -> list[str]:
+    """The ``Driver.shared`` keys naming the library.
+
+    On Windows the same library is named twice: ``windows_<arch>`` for driver managers built with
+    MSVC (Python, Rust, ...), ``windows_<arch>_mingw`` for those built with MinGW (R's
+    adbcdrivermanager, built with Rtools). The library exports plain C functions, so both load it.
+    """
+    key = _platform_key()
+    return [key, f"{key}_mingw"] if key.startswith("windows_") else [key]
+
+
 def library_path() -> str:
     """The driver library this Python environment uses."""
     from ._driver import _driver_path
@@ -59,8 +70,7 @@ def render(library: Optional[str] = None) -> str:
         "[Driver]\n"
         f"entrypoint = '{ENTRYPOINT}'\n\n"
         "[Driver.shared]\n"
-        f'{_platform_key()} = "{escaped}"\n'
-    )
+    ) + "".join(f'{key} = "{escaped}"\n' for key in _shared_keys())
 
 
 def user_directory() -> pathlib.Path:

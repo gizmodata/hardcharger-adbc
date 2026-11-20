@@ -56,6 +56,7 @@ All notable changes to this project are documented here. The format follows
   bad escape (`invalid URL escape "%ss"`), which can be part of a password. It now describes the
   problem only (`invalid uri: a % that doesn't start a two-digit hex escape (write a literal % as
   %25)`).
+- On Windows, the driver manifest that `python -m adbc_driver_hardcharger.manifest` writes also names the library under `windows_<arch>_mingw`, the key R's `adbcdrivermanager` (built with MinGW) looks up, so loading the driver by name from R on Windows works ([gizmodata/adbc-install#10](https://github.com/gizmodata/adbc-install/issues/10)). Run it again to update an existing manifest.
 
 ## [2.6.2] - 2026-11-19
 
