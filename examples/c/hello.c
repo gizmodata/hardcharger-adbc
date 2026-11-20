@@ -30,7 +30,7 @@ int main(void) {
   CHECK(AdbcDatabaseSetOption(&database, "uri", "hardcharger://localhost?tls=false", &error));
   CHECK(AdbcDatabaseSetOption(&database, "username", "hardcharger", &error));
   CHECK(AdbcDatabaseSetOption(&database, "password", "change-me", &error));
-  CHECK(AdbcDatabaseSetOption(&database, "adbc.hardcharger.query_tag", "{\"app\": \"hello.c\"}",
+  CHECK(AdbcDatabaseSetOption(&database, "hardcharger.session.query_tag", "{\"app\": \"hello.c\"}",
                               &error));
   CHECK(AdbcDatabaseInit(&database, &error));
   CHECK(AdbcConnectionNew(&connection, &error));

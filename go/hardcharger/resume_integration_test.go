@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-adbc/go/adbc"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
 // resumeFor answers the next requests whose path starts with prefix (under
@@ -21,8 +22,8 @@ func (p *sessionProxy) resumeFor(requests int, prefix string) {
 	p.resuming, p.resumingPrefix = requests, prefix
 }
 
-// adbc.hardcharger.resume_timeout is the Chargewire driver's
-// adbc.chargewire.resume_timeout: while the server answers server_resuming
+// hardcharger.retry.resume_timeout_seconds is the Chargewire driver's
+// chargewire.retry.resume_timeout_seconds: while the server answers server_resuming
 // (here a proxy, for the sign-in and the next request), the driver waits each
 // answer's Retry-After and sends the request again, until the timeout; with 0
 // it fails at once with server_resuming (StatusIO).
@@ -40,7 +41,7 @@ func TestIntegrationResumeTimeout(t *testing.T) {
 	if got := scalar(t, cnxn, "SELECT 42"); got != "42" {
 		t.Fatalf("SELECT 42 = %s", got)
 	}
-	for _, key := range []string{OptionResumeTimeout, chargewireResumeTimeout} {
+	for _, key := range []string{OptionResumeTimeout, chargewire.OptionResumeTimeout} {
 		if got, err := db.(adbc.GetSetOptionsWithContext).GetOption(context.Background(), key); err != nil || got != "30" {
 			t.Fatalf("GetOption(%s) = %q, %v; want 30", key, got, err)
 		}

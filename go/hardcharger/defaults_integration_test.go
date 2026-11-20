@@ -52,7 +52,7 @@ func TestIntegrationALargeResultIsSplitByDefault(t *testing.T) {
 		t.Fatalf("%d partitions, want 2 to 32 (the default asks for up to 32)", n)
 	}
 	// The twin: one partition when asked for one.
-	cnxn := mustOpen(t, shared, map[string]string{"adbc.chargewire.statement.result_partitions": "1"})
+	cnxn := mustOpen(t, shared, map[string]string{"chargewire.query.result_partitions": "1"})
 	if n := partitionCount(t, cnxn, largeResult); n != 1 {
 		t.Fatalf("%d partitions with result_partitions=1", n)
 	}
@@ -166,7 +166,7 @@ func TestIntegrationIngestPartsOption(t *testing.T) {
 		t.Fatalf("%d single, %d opens, %d parts; want one stream", single, opens, parts)
 	}
 	// The Chargewire name works too.
-	proxy, cnxn = proxiedOpen(t, map[string]string{"adbc.chargewire.ingest.parts": "2"})
+	proxy, cnxn = proxiedOpen(t, map[string]string{"chargewire.ingest.parts": "2"})
 	ingest(t, cnxn, "two_parts")
 	if _, opens, parts := proxy.ingestRequests(); opens != 1 || parts != 2 {
 		t.Fatalf("%d opens, %d parts; want 2 parts", opens, parts)

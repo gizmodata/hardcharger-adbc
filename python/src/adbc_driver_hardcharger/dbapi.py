@@ -159,7 +159,7 @@ class Cursor(_BaseCursor):
 
 class Connection(_BaseConnection):
     """A Hardcharger connection: helpers for session settings and tags, through the driver's
-    ``adbc.hardcharger.*`` connection options."""
+    ``hardcharger.*`` connection options."""
 
     def cursor(self, *, adbc_stmt_kwargs: Optional[dict[str, Any]] = None) -> Cursor:
         """Create a new :class:`Cursor`."""
@@ -259,13 +259,13 @@ class Connection(_BaseConnection):
 
     @property
     def session_id(self) -> str:
-        """This connection's server session id (``adbc.chargewire.session.id``), for another
+        """This connection's server session id (``hardcharger.session.id``), for another
         process to attach to with ``connect(session_id=...)``."""
         return self.adbc_connection.get_option(key=ConnectionOptions.SESSION_ID.value)
 
     @property
     def access_token(self) -> str:
-        """The access token this connection sends (``adbc.chargewire.auth.access_token``): the one
+        """The access token this connection sends (``hardcharger.auth.access_token``): the one
         the driver got by signing in, renewed first when it is about to expire (so after a
         renewal, the new one), or the ``access_token`` given to ``connect()`` as it is.
 
@@ -278,7 +278,7 @@ class Connection(_BaseConnection):
     @property
     def access_token_expires_at(self) -> Optional[datetime.datetime]:
         """When :attr:`access_token` expires (a UTC datetime), or ``None`` when the driver
-        doesn't know (``adbc.chargewire.auth.access_token_expires_at``)."""
+        doesn't know (``hardcharger.auth.access_token_expires_at``)."""
         text = self.adbc_connection.get_option(key=ConnectionOptions.ACCESS_TOKEN_EXPIRES_AT.value)
         if not text:
             return None
@@ -395,7 +395,7 @@ def connect(
         db_schema: Schema to make current for the session: one schema name in
             ``catalog`` (in the server's default catalog without it), never a
             ``catalog.schema`` path (a dot can be part of a schema's name).
-        db_kwargs: Extra ADBC database options (``adbc.hardcharger.*``, ``adbc.chargewire.*``).
+        db_kwargs: Extra ADBC database options (``hardcharger.*``).
         conn_kwargs: Extra ADBC connection options.
         autocommit: Enable autocommit (default True).
 

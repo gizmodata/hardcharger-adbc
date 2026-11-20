@@ -5,7 +5,7 @@ manager (C/C++, Go, R, Rust, Python), loading the driver library this wheel inst
     python -m adbc_driver_hardcharger.manifest --print    # print it
     python -m adbc_driver_hardcharger.manifest --dir DIR  # install into DIR
 
-The library reads ``hardcharger://`` URIs and the ``adbc.hardcharger.*`` options itself, so they
+The library reads ``hardcharger://`` URIs and the ``hardcharger.*`` options itself, so they
 work through the manifest exactly as from Python.
 """
 

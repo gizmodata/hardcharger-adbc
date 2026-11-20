@@ -203,7 +203,7 @@ func TestBadDatabaseOptionsAreRefused(t *testing.T) {
 		{OptionOAuthTimeoutSeconds, "soon"}:                    "expected a number of seconds",
 		{OptionSettingPrefix + "bad name", "1"}:                "invalid Hardcharger setting name",
 		{OptionGlobalSettingPrefix + "graceful_shutdown", "1"}: "is a connection option",
-		{"adbc.hardcharger.nope", "1"}:                         "unknown option",
+		{"hardcharger.nope", "1"}:                              "unknown option",
 		{adbc.OptionKeyURI, "hardcharger+https://h"}:           "is not a Hardcharger URI scheme",
 	} {
 		_, err := newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", opts[0]: opts[1]})
@@ -239,19 +239,19 @@ func TestSetOptionAfterCreation(t *testing.T) {
 	wantStatus(t, db.SetOption(ctx, OptionAuthType, "nope"), adbc.StatusInvalidArgument, "expected password, external or client_certificate (mtls)")
 	// The Chargewire driver's options reach it after creation too (driverbase's
 	// SetOptions refused them as unknown), and it validates them.
-	if err := db.SetOption(ctx, "adbc.chargewire.retry.max_attempts", "3"); err != nil {
+	if err := db.SetOption(ctx, "chargewire.retry.max_attempts", "3"); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := db.GetOption(ctx, "adbc.chargewire.retry.max_attempts"); got != "3" {
+	if got, _ := db.GetOption(ctx, "chargewire.retry.max_attempts"); got != "3" {
 		t.Fatalf("max attempts %q", got)
 	}
-	if err := db.SetOptions(ctx, map[string]string{OptionIngestParts: "2", "adbc.chargewire.tls.skip_verify": "true"}); err != nil {
+	if err := db.SetOptions(ctx, map[string]string{OptionIngestParts: "2", "chargewire.tls.skip_verify": "true"}); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := db.GetOption(ctx, "adbc.chargewire.tls.skip_verify"); got != "true" {
+	if got, _ := db.GetOption(ctx, "chargewire.tls.skip_verify"); got != "true" {
 		t.Fatalf("skip verify %q", got)
 	}
-	wantStatus(t, db.SetOption(ctx, "adbc.chargewire.retry.max_attempts", "zero"), adbc.StatusInvalidArgument, "adbc.chargewire.retry.max_attempts")
+	wantStatus(t, db.SetOption(ctx, "chargewire.retry.max_attempts", "zero"), adbc.StatusInvalidArgument, "chargewire.retry.max_attempts")
 }
 
 // fakeSignIn is a Chargewire server with browser sign-in (spec §4.3): discovery,
@@ -490,7 +490,7 @@ func TestBrowserCommandFromTheEnvironment(t *testing.T) {
 
 // The 1.x sign-in server's options are gone.
 func TestSideSignInServerOptionsAreGone(t *testing.T) {
-	for _, key := range []string{"adbc.hardcharger.oauth.url", "adbc.hardcharger.oauth.port"} {
+	for _, key := range []string{"hardcharger.oauth.url", "hardcharger.oauth.port"} {
 		_, err := newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", key: "x"})
 		wantStatus(t, err, adbc.StatusNotImplemented, "unknown option "+key)
 	}
@@ -502,14 +502,15 @@ func TestIngestPartsIsTheChargewireOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{OptionIngestParts, chargewireIngestParts} {
+	for _, key := range []string{OptionIngestParts, chargewire.OptionIngestParts} {
 		if got, err := db.GetOption(ctx, key); err != nil || got != "2" {
 			t.Errorf("GetOption(%s) = %q, %v", key, got, err)
 		}
 	}
 	// The Chargewire driver validates it, under either name; the twin is above.
 	_, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionIngestParts: "none"})
-	wantStatus(t, err, adbc.StatusInvalidArgument, chargewireIngestParts)
+	// The error names the key the caller wrote.
+	wantStatus(t, err, adbc.StatusInvalidArgument, "for option "+OptionIngestParts+":")
 	// Unset, it is the Chargewire driver's default: auto (16 parts on a near link, 32 on a far one).
 	db, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h"})
 	if err != nil {
@@ -518,7 +519,7 @@ func TestIngestPartsIsTheChargewireOption(t *testing.T) {
 	if got, err := db.GetOption(ctx, OptionIngestParts); err != nil || got != "auto" {
 		t.Errorf("default ingest parts %q, %v", got, err)
 	}
-	if got, err := db.GetOption(ctx, "adbc.chargewire.statement.result_partitions"); err != nil || got != "32" {
+	if got, err := db.GetOption(ctx, "chargewire.query.result_partitions"); err != nil || got != "32" {
 		t.Errorf("default result partitions %q, %v", got, err)
 	}
 }
@@ -543,7 +544,7 @@ func selfSignedPEM(t *testing.T) (certPEM, keyPEM string) {
 		string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
 }
 
-// auth_type=client_certificate is the Chargewire driver's adbc.chargewire.auth.type:
+// auth_type=client_certificate is the Chargewire driver's chargewire.auth.type:
 // the Chargewire driver's own checks run on it (they need a certificate, TLS
 // and no password), so a refusal from it proves the option reached it.
 func TestClientCertificateAuthTypeIsTheChargewireOption(t *testing.T) {
@@ -551,7 +552,7 @@ func TestClientCertificateAuthTypeIsTheChargewireOption(t *testing.T) {
 	cert, key := selfSignedPEM(t)
 	withCertificate := func(extra map[string]string) map[string]string {
 		opts := map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionAuthType: AuthTypeClientCertificate,
-			"adbc.chargewire.tls.client_cert": cert, "adbc.chargewire.tls.client_key": key}
+			"chargewire.tls.client_cert": cert, "chargewire.tls.client_key": key}
 		for k, v := range extra {
 			if v == "<unset>" {
 				delete(opts, k)
@@ -565,8 +566,8 @@ func TestClientCertificateAuthTypeIsTheChargewireOption(t *testing.T) {
 		opts map[string]string
 		text string
 	}{
-		"no certificate": {withCertificate(map[string]string{"adbc.chargewire.tls.client_cert": "<unset>",
-			"adbc.chargewire.tls.client_key": "<unset>"}), "needs a client certificate: set adbc.chargewire.tls.client_cert and adbc.chargewire.tls.client_key"},
+		"no certificate": {withCertificate(map[string]string{"chargewire.tls.client_cert": "<unset>",
+			"chargewire.tls.client_key": "<unset>"}), "needs a client certificate: set chargewire.tls.client_cert and chargewire.tls.client_key"},
 		"a password beside it": {withCertificate(map[string]string{adbc.OptionKeyUsername: "joe", adbc.OptionKeyPassword: "pw"}),
 			"signs in with the client certificate alone; do not also set username, password"},
 		"plain HTTP": {withCertificate(map[string]string{adbc.OptionKeyURI: "hardcharger://h?tls=false"}), "needs TLS"},
@@ -609,14 +610,15 @@ func TestResumeTimeoutIsTheChargewireOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{OptionResumeTimeout, chargewireResumeTimeout} {
+	for _, key := range []string{OptionResumeTimeout, chargewire.OptionResumeTimeout} {
 		if got, err := db.GetOption(ctx, key); err != nil || got != "45" {
 			t.Errorf("GetOption(%s) = %q, %v", key, got, err)
 		}
 	}
 	// The Chargewire driver validates it, under either name; the twin is above.
 	_, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h", OptionResumeTimeout: "soon"})
-	wantStatus(t, err, adbc.StatusInvalidArgument, chargewireResumeTimeout)
+	// The error names the key the caller wrote.
+	wantStatus(t, err, adbc.StatusInvalidArgument, "for option "+OptionResumeTimeout+":")
 	// Unset, it is the Chargewire driver's default, 600 s.
 	db, err = newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h"})
 	if err != nil {

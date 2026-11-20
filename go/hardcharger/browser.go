@@ -22,14 +22,14 @@ import (
 var openBrowser = func(command string) chargewire.BrowserOpener { return chargewire.SystemBrowser(command) }
 
 // browserSignIn runs a browser sign-in against the server the Chargewire
-// options name (uri and adbc.chargewire.tls.*) and returns the server's access
+// options name (uri and chargewire.tls.*) and returns the server's access
 // token and its lifetime.
 func browserSignIn(ctx context.Context, chargewireOptions map[string]string, browser string,
 	timeout time.Duration) (string, time.Duration, error) {
 	if browser == "" {
 		browser = defaultBrowser()
 	}
-	result, err := chargewire.BrowserSignIn(ctx, chargewireOptions, openBrowser(browser), timeout)
+	result, err := host.BrowserSignIn(ctx, chargewireOptions, openBrowser(browser), timeout)
 	if err != nil {
 		return "", 0, err
 	}

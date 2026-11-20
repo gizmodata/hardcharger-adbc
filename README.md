@@ -15,6 +15,7 @@
   <a href="https://docs.hardcharger.gizmodata.com/clients/python/"><img src="https://img.shields.io/badge/docs-Hardcharger-2563eb.svg" alt="Hardcharger Python client documentation"></a>
   <a href="https://arrow.apache.org/adbc/"><img src="https://img.shields.io/badge/ADBC-1.12-f15a24.svg" alt="ADBC 1.12"></a>
   <a href="https://github.com/gizmodata/hardcharger-adbc/blob/main/validation/README.md"><img src="https://img.shields.io/badge/ADBC-conformance%20suite%20passing-2ea44f.svg" alt="ADBC conformance suite passing"></a>
+  <a href="https://adbc-drivers.org/building-drivers/style-guide.html"><img src="https://img.shields.io/badge/ADBC%20style%20guide-conforms-2ea44f.svg" alt="Follows the ADBC driver style guide"></a>
   <a href="https://github.com/gizmodata/chargewire"><img src="https://img.shields.io/badge/protocol-Chargewire-31a8db.svg" alt="Chargewire protocol"></a>
   <img src="https://img.shields.io/badge/core-Go-00ADD8.svg?logo=go&logoColor=white" alt="Go core">
   <img src="https://img.shields.io/badge/bindings-Python-3776AB.svg?logo=python&logoColor=white" alt="Python bindings">
@@ -48,8 +49,8 @@ every language at once:
 - 🗂️ **ADBC connection profiles**, reusable TOML connections with environment-based credentials;
 - 🧩 **a driver manifest**, so `driver = "hardcharger"` finds it in any ADBC driver manager.
 
-> **Status: 2.6.2, with Hardcharger 2.13.0.** Speaks Chargewire protocol 1.0.0, built on
-> [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.4.0. Read-only connections require
+> **Status: 2.7.0, with Hardcharger 2.13.1.** Speaks Chargewire protocol 1.0.0, built on
+> [chargewire-adbc](https://github.com/gizmodata/chargewire-adbc) 2.5.0. Read-only connections require
 > Hardcharger 2.13.0 or newer; ordinary connections remain compatible with older servers,
 > including 2.2.0 from before the protocol rename.
 
@@ -106,7 +107,7 @@ AdbcDatabaseSetOption(&database, "driver", "hardcharger", &error);
 AdbcDatabaseSetOption(&database, "uri", "hardcharger://localhost?tls=false", &error);
 AdbcDatabaseSetOption(&database, "username", "hardcharger", &error);
 AdbcDatabaseSetOption(&database, "password", "change-me", &error);
-AdbcDatabaseSetOption(&database, "adbc.hardcharger.query_tag", "{\"app\": \"hello.c\"}", &error);
+AdbcDatabaseSetOption(&database, "hardcharger.session.query_tag", "{\"app\": \"hello.c\"}", &error);
 AdbcDatabaseInit(&database, &error);
 ```
 
@@ -154,20 +155,40 @@ driver refuses `hardcharger+http://` with a message naming `?tls=false`.
 
 ## ⚙️ Options
 
-Every option of the [Chargewire driver](https://github.com/gizmodata/chargewire-adbc#%EF%B8%8F-options)
-(`adbc.chargewire.*`: TLS, tokens, retries, compression, ...) applies, with its defaults. Two shape
-throughput and one waits for a resuming server; the driver keeps the Chargewire driver's defaults:
+Option names follow the [ADBC driver style guide](https://adbc-drivers.org/building-drivers/style-guide.html):
+every option is `hardcharger.*`. Every option `chargewire.X` of the
+[Chargewire driver](https://github.com/gizmodata/chargewire-adbc#%EF%B8%8F-options) (TLS, tokens,
+retries, compression, ...) applies as `hardcharger.X`, with its defaults (`chargewire.X` is
+accepted too). The names from before 2.7.0 still work: `adbc.hardcharger.*`, `adbc.chargewire.*`
+and `adbc.warp.*` set and read the same options, and the first time a process uses each, the driver
+prints which name to use instead to stderr, e.g.
+`[hardcharger] option "adbc.hardcharger.query_tag" is deprecated; use "hardcharger.session.query_tag"`
+(keys only, never values). When one option is given under several names, `hardcharger.*` wins.
+Besides the prefix, these names changed:
+
+| Before 2.7.0 | Now |
+|---|---|
+| `adbc.hardcharger.auth_type` | `hardcharger.auth.type` |
+| `adbc.hardcharger.session_tag` | `hardcharger.session.tag` |
+| `adbc.hardcharger.query_tag` | `hardcharger.session.query_tag` (a session setting; `hardcharger.query.tag` is the Chargewire tag sent with each statement) |
+| `adbc.hardcharger.resume_timeout`, `adbc.chargewire.resume_timeout` | `hardcharger.retry.resume_timeout_seconds` |
+| `adbc.chargewire.statement.{async, retain_result, timeout_seconds, result_partitions, result_order, id}` | `hardcharger.query.*` (same) |
+| `adbc.chargewire.statement.query_tag` | `hardcharger.query.tag` |
+| `adbc.chargewire.ipc_compression` | `hardcharger.ipc.compression` |
+
+Two options shape throughput and one waits for a resuming server; the driver keeps the
+Chargewire driver's defaults:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `adbc.chargewire.statement.result_partitions` | 32 | A large result is split into up to this many partitions, read at once over their own connections (the server decides; a result of fewer than two batches is one stream). `1`: never split |
-| `adbc.chargewire.ingest.parts` (also `adbc.hardcharger.ingest.parts`) | `auto` | A bulk ingest of two batches or more goes over up to this many connections, committed as one. Its rows land in no defined order; `1`: one stream, in the upload's order |
-| `adbc.chargewire.resume_timeout` (also `adbc.hardcharger.resume_timeout`; Python `resume_timeout=`) | 600 | Seconds to keep sending a request again while the server answers `server_resuming`: a stopped GizmoData Cloud cluster starting again because a client connected. Each repeat waits the answer's `Retry-After` (at least 1 s, at most 60 s; 3 s without one), the sign-in included; then the error is `server_resuming` (`StatusIO`). `0`: fail at once. Database only |
+| `hardcharger.query.result_partitions` | 32 | A large result is split into up to this many partitions, read at once over their own connections (the server decides; a result of fewer than two batches is one stream). `1`: never split |
+| `hardcharger.ingest.parts` | `auto` | A bulk ingest of two batches or more goes over up to this many connections, committed as one. Its rows land in no defined order; `1`: one stream, in the upload's order |
+| `hardcharger.retry.resume_timeout_seconds` (Python `resume_timeout=`) | 600 | Seconds to keep sending a request again while the server answers `server_resuming`: a stopped GizmoData Cloud cluster starting again because a client connected. Each repeat waits the answer's `Retry-After` (at least 1 s, at most 60 s; 3 s without one), the sign-in included; then the error is `server_resuming` (`StatusIO`). `0`: fail at once. Database only |
 
 **A stopped GizmoData Cloud cluster isn't started by connecting.** When the cluster is stopped,
 its stand-in says so at discovery (`"state": "stopped"`), and opening a connection (Python's
 `connect()`, `AdbcConnectionInit`) signs in and opens nothing. The connection signs in, opens its
-session, applies the session tag, query tag and `adbc.hardcharger.setting.*` settings, and so
+session, applies the session tag, query tag and `hardcharger.setting.*` settings, and so
 starts the cluster at its first request that does work (a statement, metadata, an ingest, a
 commit or rollback). Those options, and the current catalog and schema, wait for it even when set
 on the connection after it opened; a refused value fails that first request. Closing a connection that did nothing sends nothing, so a pool that opens and
@@ -179,23 +200,21 @@ Hardcharger's own:
 
 | Option | Where | Meaning |
 |---|---|---|
-| `adbc.hardcharger.query_tag` | database, connection | A JSON object recorded with every following statement (`hardcharger.query_tag`); `""` removes it |
-| `adbc.hardcharger.session_tag` | database, connection | A JSON object tagging the session (`hardcharger.session_tag`) |
-| `adbc.hardcharger.setting.NAME` | database, connection | `SET SESSION hardcharger.NAME`: on every new session (database) or now (connection; `""` resets, and GetOption reads the value that applies) |
-| `adbc.hardcharger.global_setting.NAME` | connection | `SET GLOBAL hardcharger.NAME` (admins); `""` resets |
-| `adbc.hardcharger.ingest.parts` | database, connection | `adbc.chargewire.ingest.parts` under Hardcharger's name (on a statement, use the Chargewire name) |
-| `adbc.hardcharger.resume_timeout` | database | `adbc.chargewire.resume_timeout` under Hardcharger's name (see above) |
-| `adbc.hardcharger.auth_type` | database | `password` (default), `external` (browser sign-in), or `client_certificate` (also `mtls`): sign in with the client certificate alone; it is the Chargewire driver's `adbc.chargewire.auth.type` |
-| `adbc.hardcharger.oauth.timeout_seconds` | database | How long to wait for the sign-in (default 300) |
-| `adbc.hardcharger.oauth.browser` | database | Command that opens the sign-in page (the URL is appended); default `$HARDCHARGER_BROWSER`, else the system's; `none` prints the URL |
-| `adbc.hardcharger.oauth.share_sign_in` | database | `true`: share one browser sign-in among this process's databases that sign in to the same server (see [below](#one-sign-in-for-many-connections)); default `false` |
-| `adbc.hardcharger.oauth.sign_in_key` | database | Names a shared sign-in (default `""`): only databases with the same key share one |
+| `hardcharger.session.query_tag` | database, connection | A JSON object recorded with every following statement of the session (the setting `hardcharger.query_tag`); `""` removes it. Not `hardcharger.query.tag`, the Chargewire driver's tag sent with each statement |
+| `hardcharger.session.tag` | database, connection | A JSON object tagging the session (the setting `hardcharger.session_tag`) |
+| `hardcharger.setting.NAME` | database, connection | `SET SESSION hardcharger.NAME`: on every new session (database) or now (connection; `""` resets, and GetOption reads the value that applies) |
+| `hardcharger.global_setting.NAME` | connection | `SET GLOBAL hardcharger.NAME` (admins); `""` resets |
+| `hardcharger.auth.type` | database | `password` (default), `external` (browser sign-in), or `client_certificate` (also `mtls`): sign in with the client certificate alone (the Chargewire driver's `chargewire.auth.type` does it) |
+| `hardcharger.oauth.timeout_seconds` | database | How long to wait for the sign-in (default 300) |
+| `hardcharger.oauth.browser` | database | Command that opens the sign-in page (the URL is appended); default `$HARDCHARGER_BROWSER`, else the system's; `none` prints the URL |
+| `hardcharger.oauth.share_sign_in` | database | `true`: share one browser sign-in among this process's databases that sign in to the same server (see [below](#one-sign-in-for-many-connections)); default `false` |
+| `hardcharger.oauth.sign_in_key` | database | Names a shared sign-in (default `""`): only databases with the same key share one |
 
 Tags are stored in `_hardcharger_instr.sql_statements.query_tag` and
 `_hardcharger_instr.sessions.session_tag` when the server runs with `--enable-instrumentation`;
 a tag that isn't a JSON object is refused with `Invalid JSON for query_tag`.
 
-`adbc.chargewire.session.transaction` (read-only, connection; Python
+`hardcharger.session.transaction` (read-only, connection; Python
 `ConnectionOptions.SESSION_TRANSACTION`) is the session's transaction as the server reports it:
 `none`, `open`, `aborted`, or `unknown`. It sees SQL `BEGIN` and `COMMIT` too.
 
@@ -209,13 +228,13 @@ does not sign in again on its own.
 
 A session the server loses (idle eviction, a restart) or ends for idling in a transaction
 (`session_ended`, reason `idle_in_transaction`: Hardcharger's `idle_in_transaction_session_timeout`,
-which `adbc.hardcharger.setting.idle_in_transaction_session_timeout` sets for the connection's
+which `hardcharger.setting.idle_in_transaction_session_timeout` sets for the connection's
 sessions) is replaced by a new one, as the [Chargewire driver](https://github.com/gizmodata/chargewire-adbc#%EF%B8%8F-options)
 describes. When a transaction was, or may have been, open in it, whether begun with autocommit off
 or with SQL `BEGIN`, the statement that finds it gone fails with the transaction named as lost and
 is not run again in the new session, where autocommit would commit it on its own; the next
 statement runs in the new session. The new session has the connection's Chargewire options and
-its `adbc.hardcharger.setting.*` settings and tags: the driver sets them in every session it
+its `hardcharger.setting.*` settings and tags: the driver sets them in every session it
 opens for the connection, the first and each replacement, before anything else runs there (even
 when the statement that found the old session gone is then refused because its transaction was
 lost). They are the database's, as the connection changed them since with its own options
@@ -301,7 +320,7 @@ token was likely issued before the server was stopped and to supply a new one.
 
 Each database signs in on its own, and the DB-API's `connect()` makes a database per
 connection, so a program that opens several connections (dbt, a pool, a notebook) would open a
-browser window for each. `share_sign_in=True` (option `adbc.hardcharger.oauth.share_sign_in`)
+browser window for each. `share_sign_in=True` (option `hardcharger.oauth.share_sign_in`)
 shares one sign-in among the process's databases that sign in to the same server, with the same
 TLS trust:
 
@@ -317,7 +336,7 @@ server's access token it got, until shortly before it expires (a minute, or a qu
 shorter lifetime), when the next connection signs in again. A shared token the server refuses is dropped and that connection signs in again, once.
 The token lives only in the process's memory and never goes to another server. To sign in as
 two people (or roles) to one server in one process, give each its own key:
-`share_sign_in="alice"` (option `adbc.hardcharger.oauth.sign_in_key`). In Go,
+`share_sign_in="alice"` (option `hardcharger.oauth.sign_in_key`). In Go,
 `hardcharger.ForgetSharedSignIns()` drops them all, for a sign-out.
 
 ## 🪪 Client certificate sign-in (mutual TLS)
@@ -337,16 +356,16 @@ with hardcharger.connect(uri="hardcharger://db.example.com", auth_type="client_c
     print(conn.current_user())  # the certificate's identity: ops@example.com
 ```
 
-In C, Go and every other language, set `adbc.hardcharger.auth_type` to `client_certificate`
-with the Chargewire driver's `adbc.chargewire.tls.client_cert` and `adbc.chargewire.tls.client_key` (PEM
-text; `adbc.chargewire.tls.root_certs` too when the server's certificate comes from a private CA):
+In C, Go and every other language, set `hardcharger.auth.type` to `client_certificate`
+with the Chargewire driver's `hardcharger.tls.client_cert` and `hardcharger.tls.client_key` (PEM
+text; `hardcharger.tls.root_certs` too when the server's certificate comes from a private CA):
 
 ```go
 db, err := hardcharger.NewDriver(memory.DefaultAllocator).NewDatabaseWithContext(ctx, map[string]string{
 	"uri":                      "hardcharger://db.example.com",
 	hardcharger.OptionAuthType: hardcharger.AuthTypeClientCertificate,
-	"adbc.chargewire.tls.client_cert": certPEM,
-	"adbc.chargewire.tls.client_key":  keyPEM,
+	"hardcharger.tls.client_cert": certPEM,
+	"hardcharger.tls.client_key":  keyPEM,
 })
 ```
 
@@ -381,7 +400,7 @@ with hardcharger.connect(uri="hardcharger://db.example.com", subject_token=id_to
     print(conn.current_user())  # the token's e-mail address
 ```
 
-`subject_token=` is the Chargewire driver's `adbc.chargewire.auth.subject_token` (in C, Go and every
+`subject_token=` is the Chargewire driver's `hardcharger.auth.subject_token` (in C, Go and every
 other language, set that option). Python refuses it beside `username`, `password`,
 `access_token`, `auth_type="external"` or `"client_certificate"`, and a different value for the
 same option in `db_kwargs`: the driver would otherwise use one credential and ignore the
@@ -397,7 +416,7 @@ the next exchange (`invalid_credentials`), so open a new connection with a fresh
 
 When the URI's host isn't the name on the server's certificate (you connect by IP address, or
 through a tunnel, port forward or load balancer), give the name with `tls_server_name=` (option
-`adbc.chargewire.tls.server_name`). The driver sends it as the TLS server name (SNI), so a proxy or
+`hardcharger.tls.server_name`). The driver sends it as the TLS server name (SNI), so a proxy or
 ingress that routes on SNI sends the connection to the right server, and checks the
 certificate against it instead of the URI's host:
 
@@ -472,7 +491,7 @@ with dbapi.connect(profile="hardcharger_prod") as conn, conn.cursor() as cur:
 
 Explicit Python connection options override the profile's `[Options]`. `hardcharger://` uses
 TLS by default; add `?tls=false` only for local development. For browser SSO, replace the
-`username` and `password` options with `"adbc.hardcharger.auth_type" = "external"` and use a
+`username` and `password` options with `"hardcharger.auth.type" = "external"` and use a
 server configured for browser sign-in. Other ADBC languages can reuse this profile through a
 driver manager with connection-profile support; direct Go driver calls do not resolve TOML
 profiles themselves.
@@ -504,8 +523,8 @@ with hardcharger.connect(uri="hardcharger://db.example.com", access_token=token,
         cur.execute(operation="COMMIT")
 ```
 
-They are the Chargewire driver's database options `adbc.chargewire.session.id` and
-`adbc.chargewire.session.close_on_release` (a connection option too, settable any time), in every
+They are the Chargewire driver's database options `hardcharger.session.id` and
+`hardcharger.session.close_on_release` (a connection option too, settable any time), in every
 language. Opening checks the session (`GET /chargewire/v1/sessions/{id}`) and creates none: an id the
 server doesn't have, or another user's session, fails with `NotFound` and `chargewire.code`
 `session_not_found` (the server answers both the same way). Closing an attached connection
@@ -529,12 +548,12 @@ the new one; or the `access_token` you gave `connect()`, as it is.
 with hardcharger.connect(uri="hardcharger://db.example.com", username="hardcharger", password="change-me") as conn:
     token = conn.access_token              # a bearer secret: never log it
     print(conn.access_token_expires_at)    # e.g. 2026-10-20 16:14:13+00:00 (None when unknown)
-    print(conn.adbc_connection.get_option(key="adbc.chargewire.auth.access_token_expires_at"))
+    print(conn.adbc_connection.get_option(key="hardcharger.auth.access_token_expires_at"))
     # '2026-10-20T16:14:13Z'
 ```
 
-They are the Chargewire driver's `adbc.chargewire.auth.access_token` and
-`adbc.chargewire.auth.access_token_expires_at` (read-only; RFC 3339 UTC, from the token response's
+They are the Chargewire driver's `hardcharger.auth.access_token` and
+`hardcharger.auth.access_token_expires_at` (read-only; RFC 3339 UTC, from the token response's
 `expires_in` or the token's own `exp`, `""` when unknown), readable on the database and the
 connection in every language. The token works as `Authorization: Bearer <token>` on the
 server's HTTP API, and with `session_id` it lets another process carry on in this connection's
@@ -592,7 +611,7 @@ packaging/           the driver manifest template
 ## 🛠️ Building and testing
 
 Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.10+. The Chargewire
-driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.4.0
+driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.5.0
 in `go/go.mod`.
 
 ```bash

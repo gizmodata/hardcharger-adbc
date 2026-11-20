@@ -126,16 +126,16 @@ func TestSharedSignInWaiterGivesUp(t *testing.T) {
 func TestSignInKeys(t *testing.T) {
 	base := signInKeyFor("chargewire://h:31337", nil, "")
 	same := []signInKey{
-		signInKeyFor("chargewire://H:31337/", map[string]string{"adbc.chargewire.retry.max_attempts": "2"}, ""),
+		signInKeyFor("chargewire://H:31337/", map[string]string{"chargewire.retry.max_attempts": "2"}, ""),
 	}
 	different := map[string]signInKey{
 		"another server":    signInKeyFor("chargewire://h:31338", nil, ""),
 		"another host":      signInKeyFor("chargewire://other:31337", nil, ""),
 		"plain HTTP":        signInKeyFor("chargewire://h:31337?tls=false", nil, ""),
 		"another base path": signInKeyFor("chargewire://h:31337/x", nil, ""),
-		"other roots":       signInKeyFor("chargewire://h:31337", map[string]string{"adbc.chargewire.tls.root_certs": "pem"}, ""),
-		"skip verify":       signInKeyFor("chargewire://h:31337", map[string]string{"adbc.chargewire.tls.skip_verify": "true"}, ""),
-		"server name":       signInKeyFor("chargewire://h:31337", map[string]string{"adbc.chargewire.tls.server_name": "x"}, ""),
+		"other roots":       signInKeyFor("chargewire://h:31337", map[string]string{"chargewire.tls.root_certs": "pem"}, ""),
+		"skip verify":       signInKeyFor("chargewire://h:31337", map[string]string{"chargewire.tls.skip_verify": "true"}, ""),
+		"server name":       signInKeyFor("chargewire://h:31337", map[string]string{"chargewire.tls.server_name": "x"}, ""),
 		"another key":       signInKeyFor("chargewire://h:31337", nil, "alice"),
 	}
 	for _, key := range same {
@@ -175,7 +175,7 @@ func TestShareSignInOptions(t *testing.T) {
 	}
 	defer db.Close(ctx)
 	_, err = db.Open(ctx)
-	wantStatus(t, err, adbc.StatusInvalidArgument, "needs adbc.hardcharger.auth_type=external")
+	wantStatus(t, err, adbc.StatusInvalidArgument, "needs hardcharger.auth.type=external")
 }
 
 // --- TLS to a plain-HTTP server -----------------------------------------------------------------
