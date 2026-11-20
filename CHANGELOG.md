@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows, the driver manifest that `python -m adbc_driver_hardcharger.manifest` writes also names the library under `windows_<arch>_mingw`, the key R's `adbcdrivermanager` (built with MinGW) looks up, so loading the driver by name from R on Windows works ([gizmodata/adbc-install#10](https://github.com/gizmodata/adbc-install/issues/10)). Run it again to update an existing manifest.
+
 ## [2.6.2] - 2026-11-19
 
 ### Changed
