@@ -104,6 +104,7 @@ TLS is on unless the URI says `?tls=false`, and the driver never falls back to p
 | `session_tag`, `query_tag` | JSON objects (a `dict`) recorded in Hardcharger's instrumentation |
 | `settings` | `hardcharger.*` session settings, e.g. `{"query_timeout": 60}` |
 | `catalog`, `db_schema` | The current catalog and schema |
+| `read_only` | `True`: ask the server to enforce read-only on the connection before anything runs on it (Hardcharger 2.13.0 or newer); one-way, and a refusal is an error. It sets the ADBC standard option `adbc.connection.readonly` (see "Read-only connections" below) |
 | `session_id`, `close_session_on_release` | Attach to an existing session; keep a session when closing |
 | `resume_timeout` | Seconds to wait for a stopped GizmoData Cloud cluster that is starting again (default 600) |
 | `autocommit` | Default `True` |
