@@ -12,7 +12,7 @@ import (
 )
 
 // sessionSetup is what a connection sets up with SQL in each of its sessions:
-// the database's tags and adbc.hardcharger.setting.* settings, as the
+// the database's tags and hardcharger.setting.* settings, as the
 // connection's own SetOption calls changed them since. The Chargewire driver
 // runs it (a new-session hook) on the connection's first session and on every
 // session that replaces a lost one, before anything else runs there, so a
@@ -24,7 +24,7 @@ type sessionSetup struct {
 	queryTag   *string
 	settings   []setting // one per name, in the order first given
 	// applied: the hook ran on a session (it doesn't on one the connection
-	// attached to, adbc.chargewire.session.id).
+	// attached to, chargewire.session.id).
 	applied atomic.Bool
 }
 

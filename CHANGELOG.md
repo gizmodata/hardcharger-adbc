@@ -6,6 +6,57 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-20
+
+### Changed
+
+- **Option names follow the [ADBC driver style guide](https://adbc-drivers.org/building-drivers/style-guide.html)**:
+  every option is `hardcharger.*`. The guide reserves `adbc.` for the ADBC specification's own
+  options, so `adbc.hardcharger.*` becomes `hardcharger.*`, and the Chargewire driver's options
+  (TLS, tokens, retries, sessions, statements, ...), which were `adbc.chargewire.*`, are now
+  `hardcharger.*` too (`hardcharger.tls.root_certs`, `hardcharger.query.timeout_seconds`; the
+  Chargewire driver's own `chargewire.*` names are accepted as well). Besides the prefix:
+
+  | Before | Now |
+  |---|---|
+  | `adbc.hardcharger.auth_type` | `hardcharger.auth.type` |
+  | `adbc.hardcharger.session_tag` | `hardcharger.session.tag` |
+  | `adbc.hardcharger.query_tag` | `hardcharger.session.query_tag` |
+  | `adbc.hardcharger.resume_timeout`, `adbc.chargewire.resume_timeout` | `hardcharger.retry.resume_timeout_seconds` |
+  | `adbc.chargewire.statement.{async, retain_result, timeout_seconds, result_partitions, result_order, id}` | `hardcharger.query.*` (same) |
+  | `adbc.chargewire.statement.query_tag` | `hardcharger.query.tag` (the tag sent with each statement; not `hardcharger.session.query_tag`) |
+  | `adbc.chargewire.ipc_compression` | `hardcharger.ipc.compression` |
+
+  The Go constants and the Python enums (`DatabaseOptions`, `ConnectionOptions`,
+  `StatementOptions`) keep their names and carry the new keys; Python's `connect()` arguments
+  don't change. **The old names still work**, `adbc.hardcharger.*`, `adbc.chargewire.*` and the
+  older `adbc.warp.*`, for setting and reading options, on databases, connections and (now for
+  `hardcharger.*` too) statements; the first time a process uses each, the driver prints
+  `[hardcharger] option "<old>" is deprecated; use "<new>"` to stderr (keys only, never values).
+  When one option is given under several names, `hardcharger.*` wins, then `chargewire.*`, then an
+  old name, whatever the order. An unknown key keeps the spelling it was given, so the error
+  names what the caller wrote (`unknown option adbc.hardcharger.no_such_option`).
+- **The PyPI page has its branding back**: `python/README.md` gets the Hardcharger banner, the
+  full badge row (CI, PyPI version, Python, downloads, docs, ADBC, conformance suite, Chargewire,
+  Go core, Python bindings, server, license, GizmoData), the tagline, the section icons and the
+  GizmoData logo footer that 2.6.1 dropped when the page became Python-only. The content stays
+  Python-only. Both READMEs carry a badge for the style guide, linked to it.
+- **Built on chargewire-adbc 2.5.0** (from 2.4.0): its style-guide option names, which this
+  release builds on (`chargewire.NewDriverForHost`).
+- **Dependencies**: Go toolchain 1.27.4 (from 1.27.3), arrow-go 18.9.0 (from 18.8.0),
+  klauspost/compress 1.20.5, driverbase-go 2026-11-15, brotli 1.3.0, grpc-gateway 2.34.0,
+  golang.org/x/net 0.63.0, golang.org/x/tools 0.53.0 and the genproto modules; zig 0.17.1 (from
+  0.17.0) for the cross-compiled libraries; `ruff>=0.17.6`; the ADBC Driver Foundry's validation
+  suite at its 2026-11-19 commit. `THIRD_PARTY_NOTICES` regenerated. The Python runtime floors stay
+  at dlt's (`pyarrow>=16.0.0`, `adbc-driver-manager>=1.8.0`).
+
+### Fixed
+
+- **A uri that doesn't parse no longer quotes any of it in the error**: the message named the
+  bad escape (`invalid URL escape "%ss"`), which can be part of a password. It now describes the
+  problem only (`invalid uri: a % that doesn't start a two-digit hex escape (write a literal % as
+  %25)`).
+
 ## [2.6.2] - 2026-11-19
 
 ### Changed

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/apache/arrow-adbc/go/adbc"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
 // The URI helper's name from before the rename keeps its result: the old scheme.
@@ -61,12 +62,12 @@ func TestLegacyOptionKeysReadAsCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{OptionIngestParts, chargewireIngestParts, "adbc.warp.ingest.parts"} {
+	for _, key := range []string{OptionIngestParts, chargewire.OptionIngestParts, "adbc.warp.ingest.parts"} {
 		if got, err := db.GetOption(ctx, key); err != nil || got != "2" {
 			t.Errorf("GetOption(%s) = %q, %v", key, got, err)
 		}
 	}
-	if got := db.chargewireOptions["adbc.chargewire.tls.server_name"]; got != "x" {
+	if got := db.chargewireOptions[chargewire.OptionTLSServerName]; got != "x" {
 		t.Errorf("server name %q", got)
 	}
 	current, err := newDB(t, map[string]string{adbc.OptionKeyURI: "hardcharger://h",

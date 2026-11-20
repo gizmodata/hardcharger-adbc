@@ -103,8 +103,8 @@ func (ca *certificateAuthority) mtlsServerArgs(extra ...string) []string {
 // certificateOptions sign in with cert/key alone: no user name or password.
 func certificateOptions(ca *certificateAuthority, cert, key string) map[string]string {
 	return map[string]string{adbc.OptionKeyUsername: "<unset>", adbc.OptionKeyPassword: "<unset>",
-		OptionAuthType: AuthTypeClientCertificate, "adbc.chargewire.tls.root_certs": ca.caPEM,
-		"adbc.chargewire.tls.client_cert": cert, "adbc.chargewire.tls.client_key": key}
+		OptionAuthType: AuthTypeClientCertificate, "chargewire.tls.root_certs": ca.caPEM,
+		"chargewire.tls.client_cert": cert, "chargewire.tls.client_key": key}
 }
 
 const opsIdentity = "OPS@example.com" // configured spelling; the certificate says ops@example.com
@@ -253,7 +253,7 @@ func TestIntegrationClientCertificateBoundTokenOverAnotherCertificate(t *testing
 	token := certificateToken(t, server, ca, ops, opsKey)
 	withToken := func(cert, key string) map[string]string {
 		opts := certificateOptions(ca, cert, key)
-		opts[OptionAuthType], opts["adbc.chargewire.auth.access_token"] = AuthTypePassword, token
+		opts[OptionAuthType], opts["chargewire.auth.access_token"] = AuthTypePassword, token
 		return opts
 	}
 	_, _, err := open(t, server, withToken(other, otherKey))

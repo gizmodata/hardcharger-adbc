@@ -138,7 +138,7 @@ jobs:
           cache-dependency-path: go/go.sum
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.17.0
+          version: 0.17.1
       - uses: ./.github/actions/hardcharger-server
         with:
           image: ${{ env.HARDCHARGER_IMAGE }}
@@ -301,7 +301,7 @@ jobs:
           cache-dependency-path: go/go.sum
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.17.0
+          version: 0.17.1
       - uses: ./.github/actions/hardcharger-server
         with:
           image: ${{ env.HARDCHARGER_IMAGE }}

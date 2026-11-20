@@ -12,7 +12,7 @@
 # `python -m adbc_driver_hardcharger.manifest` writes it with the path filled in.
 #
 # The library reads hardcharger:// URIs (HTTPS; ?tls=false for plain HTTP; port 31337 unless
-# given) and the adbc.hardcharger.* options itself.
+# given) and the hardcharger.* options itself.
 
 manifest_version = 1
 

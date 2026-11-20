@@ -271,7 +271,7 @@ func TestIntegrationTLSIsTheDefaultAndVerifies(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "certificate") {
 		t.Fatalf("an untrusted certificate: %v", err)
 	}
-	cnxn := mustOpen(t, server, map[string]string{"adbc.chargewire.tls.root_certs": string(caPEM)})
+	cnxn := mustOpen(t, server, map[string]string{"chargewire.tls.root_certs": string(caPEM)})
 	if got := scalar(t, cnxn, "SELECT 1"); got != "1" {
 		t.Fatal(got)
 	}

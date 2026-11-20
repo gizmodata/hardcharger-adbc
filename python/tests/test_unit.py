@@ -55,20 +55,20 @@ class TestConnectOptions:
         )
         assert _db_kwargs(mock_db=mock_db) == {
             "uri": "hardcharger://h",
-            "adbc.hardcharger.auth_type": "external",
-            "adbc.hardcharger.oauth.timeout_seconds": "2.5",
-            "adbc.hardcharger.oauth.browser": "none",
-            "adbc.hardcharger.session_tag": '{"app":"etl"}',
-            "adbc.hardcharger.query_tag": '{"job": "x"}',
-            "adbc.hardcharger.setting.query_timeout": "60",
-            "adbc.hardcharger.setting.bypass_queue": "true",
-            "adbc.chargewire.tls.root_certs": PEM,
+            "hardcharger.auth.type": "external",
+            "hardcharger.oauth.timeout_seconds": "2.5",
+            "hardcharger.oauth.browser": "none",
+            "hardcharger.session.tag": '{"app":"etl"}',
+            "hardcharger.session.query_tag": '{"job": "x"}',
+            "hardcharger.setting.query_timeout": "60",
+            "hardcharger.setting.bypass_queue": "true",
+            "hardcharger.tls.root_certs": PEM,
         }
         assert mock_conn.call_args.kwargs["adbc.connection.catalog"] == "memory"
 
     def test_browser_command(self, mock_db, mock_conn, mock_cls):
         hardcharger.connect(uri="hardcharger://h", auth_type="external", open_browser="firefox")
-        assert _db_kwargs(mock_db=mock_db)["adbc.hardcharger.oauth.browser"] == "firefox"
+        assert _db_kwargs(mock_db=mock_db)["hardcharger.oauth.browser"] == "firefox"
 
     def test_profile_uri(self, mock_db, mock_conn, mock_cls):
         hardcharger.connect(uri="profile://prod")
@@ -93,9 +93,9 @@ class TestConnectOptions:
             uri="hardcharger://h", auth_type=spelling, tls_client_cert=cert, tls_client_key=key
         )
         kwargs = _db_kwargs(mock_db=mock_db)
-        assert kwargs["adbc.hardcharger.auth_type"] == "client_certificate"
-        assert kwargs["adbc.chargewire.tls.client_cert"] == PEM
-        assert kwargs["adbc.chargewire.tls.client_key"].startswith("-----BEGIN PRIVATE KEY-----")
+        assert kwargs["hardcharger.auth.type"] == "client_certificate"
+        assert kwargs["hardcharger.tls.client_cert"] == PEM
+        assert kwargs["hardcharger.tls.client_key"].startswith("-----BEGIN PRIVATE KEY-----")
         assert "username" not in kwargs and "password" not in kwargs
 
     def test_the_side_sign_in_servers_arguments_are_gone(self, mock_db, mock_conn, mock_cls):
@@ -117,12 +117,12 @@ class TestConnectOptions:
     @pytest.mark.parametrize(
         argnames=("share_sign_in", "expected"),
         argvalues=[
-            (True, {"adbc.hardcharger.oauth.share_sign_in": "true"}),
+            (True, {"hardcharger.oauth.share_sign_in": "true"}),
             (
                 "alice",
                 {
-                    "adbc.hardcharger.oauth.share_sign_in": "true",
-                    "adbc.hardcharger.oauth.sign_in_key": "alice",
+                    "hardcharger.oauth.share_sign_in": "true",
+                    "hardcharger.oauth.sign_in_key": "alice",
                 },
             ),
             (False, {}),
@@ -134,7 +134,7 @@ class TestConnectOptions:
         )
         assert _db_kwargs(mock_db=mock_db) == {
             "uri": "hardcharger://h",
-            "adbc.hardcharger.auth_type": "external",
+            "hardcharger.auth.type": "external",
             **expected,
         }
 
@@ -160,7 +160,7 @@ class TestConnectOptions:
         hardcharger.connect(uri="hardcharger://h", subject_token="eyJ.idp.jwt")
         assert _db_kwargs(mock_db=mock_db) == {
             "uri": "hardcharger://h",
-            "adbc.chargewire.auth.subject_token": "eyJ.idp.jwt",
+            "hardcharger.auth.subject_token": "eyJ.idp.jwt",
         }
 
     @pytest.mark.parametrize(
@@ -168,15 +168,15 @@ class TestConnectOptions:
         argvalues=[
             ({"username": "u", "password": "p"}, "drop username, password"),
             ({"password": "p"}, "drop password"),
-            ({"access_token": "t"}, "drop adbc.chargewire.auth.access_token"),
+            ({"access_token": "t"}, "drop hardcharger.auth.access_token"),
             ({"db_kwargs": {"username": "u"}}, "drop username"),
             (
-                {"db_kwargs": {"adbc.chargewire.auth.access_token": "t"}},
-                "drop adbc.chargewire.auth.access",
+                {"db_kwargs": {"hardcharger.auth.access_token": "t"}},
+                "drop hardcharger.auth.access",
             ),
             ({"auth_type": "external"}, "signs in through the browser: drop .*subject_token"),
             ({"auth_type": "mtls"}, "drop auth_type='client_certificate'"),
-            ({"db_kwargs": {"adbc.chargewire.auth.subject_token": "other"}}, "disagree"),
+            ({"db_kwargs": {"hardcharger.auth.subject_token": "other"}}, "disagree"),
         ],
     )
     def test_subject_token_refuses_other_credentials(
@@ -194,7 +194,7 @@ class TestConnectOptions:
                 uri="hardcharger://h",
                 username="u",
                 password="p",
-                db_kwargs={"adbc.chargewire.auth.subject_token": "eyJ.idp.jwt"},
+                db_kwargs={"hardcharger.auth.subject_token": "eyJ.idp.jwt"},
             )
         mock_db.assert_not_called()
 
@@ -202,9 +202,9 @@ class TestConnectOptions:
         hardcharger.connect(
             uri="hardcharger://h",
             subject_token="eyJ.idp.jwt",
-            db_kwargs={"adbc.chargewire.auth.subject_token": "eyJ.idp.jwt"},
+            db_kwargs={"hardcharger.auth.subject_token": "eyJ.idp.jwt"},
         )
-        assert _db_kwargs(mock_db=mock_db)["adbc.chargewire.auth.subject_token"] == "eyJ.idp.jwt"
+        assert _db_kwargs(mock_db=mock_db)["hardcharger.auth.subject_token"] == "eyJ.idp.jwt"
 
     def test_tls_server_name(self, mock_db, mock_conn, mock_cls):
         hardcharger.connect(
@@ -217,7 +217,7 @@ class TestConnectOptions:
             "uri": "hardcharger://10.0.0.7",
             "username": "u",
             "password": "p",
-            "adbc.chargewire.tls.server_name": "hc-1.gizmodata.test",
+            "hardcharger.tls.server_name": "hc-1.gizmodata.test",
         }
 
     def test_session_id_and_close_session_on_release(self, mock_db, mock_conn, mock_cls):
@@ -229,24 +229,24 @@ class TestConnectOptions:
         )
         assert _db_kwargs(mock_db=mock_db) == {
             "uri": "hardcharger://h",
-            "adbc.chargewire.auth.access_token": "tok",
-            "adbc.chargewire.session.id": "s_1",
-            "adbc.chargewire.session.close_on_release": "true",
+            "hardcharger.auth.access_token": "tok",
+            "hardcharger.session.id": "s_1",
+            "hardcharger.session.close_on_release": "true",
         }
         hardcharger.connect(uri="hardcharger://h", close_session_on_release=False)
-        assert _db_kwargs(mock_db=mock_db)["adbc.chargewire.session.close_on_release"] == "false"
+        assert _db_kwargs(mock_db=mock_db)["hardcharger.session.close_on_release"] == "false"
         hardcharger.connect(uri="hardcharger://h")
-        assert "adbc.chargewire.session.close_on_release" not in _db_kwargs(mock_db=mock_db)
+        assert "hardcharger.session.close_on_release" not in _db_kwargs(mock_db=mock_db)
 
     def test_resume_timeout(self, mock_db, mock_conn, mock_cls):
         hardcharger.connect(uri="hardcharger://h", access_token="tok", resume_timeout=90)
-        assert _db_kwargs(mock_db=mock_db)["adbc.hardcharger.resume_timeout"] == "90"
+        assert _db_kwargs(mock_db=mock_db)["hardcharger.retry.resume_timeout_seconds"] == "90"
         hardcharger.connect(uri="hardcharger://h", resume_timeout=0)
-        assert _db_kwargs(mock_db=mock_db)["adbc.hardcharger.resume_timeout"] == "0"
+        assert _db_kwargs(mock_db=mock_db)["hardcharger.retry.resume_timeout_seconds"] == "0"
         hardcharger.connect(uri="hardcharger://h", resume_timeout=2.5)
-        assert _db_kwargs(mock_db=mock_db)["adbc.hardcharger.resume_timeout"] == "2.5"
+        assert _db_kwargs(mock_db=mock_db)["hardcharger.retry.resume_timeout_seconds"] == "2.5"
         hardcharger.connect(uri="hardcharger://h")
-        assert "adbc.hardcharger.resume_timeout" not in _db_kwargs(mock_db=mock_db)
+        assert "hardcharger.retry.resume_timeout_seconds" not in _db_kwargs(mock_db=mock_db)
 
     def test_resume_timeout_refusals(self, mock_db, mock_conn, mock_cls):
         with pytest.raises(expected_exception=TypeError, match="resume_timeout must be a number"):
@@ -257,7 +257,7 @@ class TestConnectOptions:
             hardcharger.connect(
                 uri="hardcharger://h",
                 resume_timeout=5,
-                db_kwargs={"adbc.hardcharger.resume_timeout": "6"},
+                db_kwargs={"hardcharger.retry.resume_timeout_seconds": "6"},
             )
         mock_db.assert_not_called()
 
@@ -267,14 +267,14 @@ class TestConnectOptions:
             ({"session_id": ""}, ValueError, "session_id can't be empty"),
             ({"close_session_on_release": "false"}, TypeError, "must be a bool, not str"),
             (
-                {"session_id": "s_1", "db_kwargs": {"adbc.chargewire.session.id": "s_2"}},
+                {"session_id": "s_1", "db_kwargs": {"hardcharger.session.id": "s_2"}},
                 ValueError,
                 "session_id= and db_kwargs",
             ),
             (
                 {
                     "close_session_on_release": True,
-                    "db_kwargs": {"adbc.chargewire.session.close_on_release": "false"},
+                    "db_kwargs": {"hardcharger.session.close_on_release": "false"},
                 },
                 ValueError,
                 "disagree",
@@ -291,7 +291,7 @@ class TestConnectOptions:
             hardcharger.connect(
                 uri="hardcharger://10.0.0.7",
                 tls_server_name="hc-1.gizmodata.test",
-                db_kwargs={"adbc.chargewire.tls.server_name": "hc-2.gizmodata.test"},
+                db_kwargs={"hardcharger.tls.server_name": "hc-2.gizmodata.test"},
             )
         for kwargs in ({"subject_token": ""}, {"tls_server_name": ""}):
             with pytest.raises(expected_exception=ValueError, match="can't be empty"):
@@ -317,15 +317,15 @@ def test_access_token_properties():
 
     conn = _FakeConnection(
         options={
-            "adbc.chargewire.auth.access_token": "eyJ.tok",
-            "adbc.chargewire.auth.access_token_expires_at": "2026-10-20T15:14:13Z",
+            "hardcharger.auth.access_token": "eyJ.tok",
+            "hardcharger.auth.access_token_expires_at": "2026-10-20T15:14:13Z",
         }
     )
     assert hardcharger.Connection.access_token.fget(conn) == "eyJ.tok"
     assert hardcharger.Connection.access_token_expires_at.fget(conn) == datetime.datetime(
         year=2026, month=10, day=20, hour=15, minute=14, second=13, tzinfo=datetime.timezone.utc
     )
-    conn.adbc_connection.options["adbc.chargewire.auth.access_token_expires_at"] = ""
+    conn.adbc_connection.options["hardcharger.auth.access_token_expires_at"] = ""
     assert hardcharger.Connection.access_token_expires_at.fget(conn) is None
 
 
@@ -363,17 +363,17 @@ class TestLibrary:
             username="u",
             password="p",
             **{
-                "adbc.hardcharger.query_tag": '{"a":1}',
-                "adbc.hardcharger.oauth.timeout_seconds": "40",
+                "hardcharger.session.query_tag": '{"a":1}',
+                "hardcharger.oauth.timeout_seconds": "40",
             },
         ) as db:
             assert db.get_option(key="uri") == "hardcharger://127.0.0.1?tls=false"
-            assert db.get_option(key="adbc.hardcharger.query_tag") == '{"a":1}'
-            assert db.get_option(key="adbc.hardcharger.oauth.timeout_seconds") == "40"
+            assert db.get_option(key="hardcharger.session.query_tag") == '{"a":1}'
+            assert db.get_option(key="hardcharger.oauth.timeout_seconds") == "40"
 
     def test_the_side_sign_in_servers_options_are_refused(self):
         # The library refuses them by name: browser sign-in is on the server's own port.
-        for key in ("adbc.hardcharger.oauth.port", "adbc.hardcharger.oauth.url"):
+        for key in ("hardcharger.oauth.port", "hardcharger.oauth.url"):
             with pytest.raises(expected_exception=adbc_driver_manager.NotSupportedError) as error:
                 adbc_driver_manager.AdbcDatabase(
                     driver=_driver_path(), uri="hardcharger://127.0.0.1", **{key: "x"}
@@ -389,7 +389,7 @@ class TestLibrary:
                 uri="hardcharger://127.0.0.1",
                 username="u",
                 password="p",
-                **{"adbc.hardcharger.auth_type": "client_certificate"},
+                **{"hardcharger.auth.type": "client_certificate"},
             )
         assert error.value.status_code == adbc_driver_manager.AdbcStatusCode.INVALID_ARGUMENT
         assert "signs in with the client certificate alone; do not also set username" in str(
@@ -399,9 +399,9 @@ class TestLibrary:
             adbc_driver_manager.AdbcDatabase(
                 driver=_driver_path(),
                 uri="hardcharger://127.0.0.1",
-                **{"adbc.hardcharger.auth_type": "mtls"},
+                **{"hardcharger.auth.type": "mtls"},
             )
-        assert "needs a client certificate: set adbc.chargewire.tls.client_cert" in str(error.value)
+        assert "needs a client certificate: set chargewire.tls.client_cert" in str(error.value)
 
     def test_subject_token_reaches_the_chargewire_driver(self):
         # Its checks see it: a token exchange beside a client certificate sign-in is refused.
@@ -410,40 +410,40 @@ class TestLibrary:
                 driver=_driver_path(),
                 uri="hardcharger://127.0.0.1",
                 **{
-                    "adbc.hardcharger.auth_type": "client_certificate",
-                    "adbc.chargewire.auth.subject_token": "eyJ.idp.jwt",
+                    "hardcharger.auth.type": "client_certificate",
+                    "hardcharger.auth.subject_token": "eyJ.idp.jwt",
                 },
             )
-        assert "do not also set adbc.chargewire.auth.subject_token" in str(error.value)
+        assert "do not also set chargewire.auth.subject_token" in str(error.value)
 
     def test_tls_server_name_reaches_the_chargewire_driver(self):
         with adbc_driver_manager.AdbcDatabase(
             driver=_driver_path(),
             uri="hardcharger://10.0.0.7",
-            **{"adbc.chargewire.tls.server_name": "hc-1.gizmodata.test"},
+            **{"hardcharger.tls.server_name": "hc-1.gizmodata.test"},
         ) as db:
-            assert db.get_option(key="adbc.chargewire.tls.server_name") == "hc-1.gizmodata.test"
+            assert db.get_option(key="hardcharger.tls.server_name") == "hc-1.gizmodata.test"
 
     def test_resume_timeout_is_the_chargewire_option(self):
         with adbc_driver_manager.AdbcDatabase(
             driver=_driver_path(),
             uri="hardcharger://127.0.0.1",
-            **{"adbc.hardcharger.resume_timeout": "45"},
+            **{"hardcharger.retry.resume_timeout_seconds": "45"},
         ) as db:
-            assert db.get_option(key="adbc.hardcharger.resume_timeout") == "45"
-            assert db.get_option(key="adbc.chargewire.resume_timeout") == "45"
+            assert db.get_option(key="hardcharger.retry.resume_timeout_seconds") == "45"
+            assert db.get_option(key="hardcharger.retry.resume_timeout_seconds") == "45"
 
     def test_session_options_reach_the_chargewire_driver(self):
         with adbc_driver_manager.AdbcDatabase(
             driver=_driver_path(),
             uri="hardcharger://127.0.0.1",
             **{
-                "adbc.chargewire.session.id": "s_1",
-                "adbc.chargewire.session.close_on_release": "false",
+                "hardcharger.session.id": "s_1",
+                "hardcharger.session.close_on_release": "false",
             },
         ) as db:
-            assert db.get_option(key="adbc.chargewire.session.id") == "s_1"
-            assert db.get_option(key="adbc.chargewire.session.close_on_release") == "false"
+            assert db.get_option(key="hardcharger.session.id") == "s_1"
+            assert db.get_option(key="hardcharger.session.close_on_release") == "false"
 
     def test_plus_http_is_refused(self):
         with pytest.raises(expected_exception=adbc_driver_manager.Error) as error:
@@ -456,9 +456,9 @@ class TestLibrary:
     @pytest.mark.parametrize(
         argnames=("key", "value", "text"),
         argvalues=[
-            ("adbc.hardcharger.auth_type", "oauth", "expected password, external or client_cert"),
-            ("adbc.hardcharger.setting.bad name", "1", "invalid Hardcharger setting name"),
-            ("adbc.hardcharger.nope", "1", "unknown option"),
+            ("hardcharger.auth.type", "oauth", "expected password, external or client_cert"),
+            ("hardcharger.setting.bad name", "1", "invalid Hardcharger setting name"),
+            ("hardcharger.nope", "1", "unknown option"),
         ],
     )
     def test_bad_options_are_refused(self, key, value, text):

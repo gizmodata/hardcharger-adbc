@@ -23,7 +23,7 @@ import (
 )
 
 // A session that replaces a lost one gets the connection's tags and
-// adbc.hardcharger.setting.* settings, as they were when the session was
+// hardcharger.setting.* settings, as they were when the session was
 // lost (the database's, changed by the connection since), before anything
 // else runs in it: for every way a session is replaced (an idle eviction,
 // session_ended with token_expired or idle_in_transaction, a session lost
@@ -31,8 +31,8 @@ import (
 // refused because a transaction was lost with the session.
 
 const (
-	sessionIDOption    = "adbc.chargewire.session.id"
-	replacementsOption = "adbc.chargewire.session.replacements"
+	sessionIDOption    = "chargewire.session.id"
+	replacementsOption = "chargewire.session.replacements"
 	setupSessionTag    = `{"app":"replay"}`
 	setupQueryTag      = `{"job":"connect"}`
 	laterQueryTag      = `{"job":"later"}`

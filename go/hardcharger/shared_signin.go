@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-adbc/go/adbc"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
 // A shared browser sign-in: with OptionOAuthShareSignIn, the databases of one
@@ -141,7 +142,7 @@ func signInKeyFor(chargewireURI string, chargewireOptions map[string]string, lab
 		server = tls + "://" + strings.ToLower(u.Host) + strings.TrimSuffix(u.Path, "/")
 	}
 	trust := sha256.New()
-	for _, option := range []string{"adbc.chargewire.tls.root_certs", "adbc.chargewire.tls.skip_verify", "adbc.chargewire.tls.server_name"} {
+	for _, option := range []string{chargewire.OptionTLSRootCerts, chargewire.OptionTLSSkipVerify, chargewire.OptionTLSServerName} {
 		trust.Write([]byte(option + "=" + chargewireOptions[option] + "\x00"))
 	}
 	return signInKey{server: server, trust: hex.EncodeToString(trust.Sum(nil)), label: label}

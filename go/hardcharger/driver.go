@@ -13,7 +13,7 @@
 //   - "ADBC Hardcharger Driver - Go" as the driver name in GetInfo (the
 //     vendor name, "Hardcharger", comes from the server);
 //
-//   - Hardcharger's options (adbc.hardcharger.*): session and query tags,
+//   - Hardcharger's options (hardcharger.*): session and query tags,
 //     hardcharger.* settings, browser sign-in, and client certificate
 //     sign-in (auth_type=client_certificate, the Chargewire driver's).
 //
@@ -49,11 +49,11 @@ const DriverName = "ADBC Hardcharger Driver - Go"
 
 // optionAccessToken is the Chargewire driver's option for a token issued
 // elsewhere: here, the server's own token from a browser sign-in.
-const optionAccessToken = "adbc.chargewire.auth.access_token"
+const optionAccessToken = chargewire.OptionAccessToken
 
 // NewDriver returns the Hardcharger ADBC driver.
 func NewDriver(alloc memory.Allocator) driverbase.Driver {
-	return &driverImpl{inner: chargewire.NewDriverWithName(alloc, DriverName)}
+	return &driverImpl{inner: chargewire.NewDriverForHost(alloc, DriverName, host)}
 }
 
 type driverImpl struct {
@@ -110,10 +110,6 @@ func (db *database) take(opts map[string]string) (map[string]string, error) {
 	for _, key := range keys {
 		value := opts[key]
 		switch {
-		case key == OptionIngestParts:
-			chargewireOpts[chargewireIngestParts] = value
-		case key == OptionResumeTimeout:
-			chargewireOpts[chargewireResumeTimeout] = value
 		case key == OptionAuthType:
 			if err := db.cfg.set(key, value); err != nil {
 				return nil, err
@@ -159,13 +155,10 @@ func (db *database) SetOptions(ctx context.Context, opts map[string]string) erro
 }
 
 func (db *database) GetOption(ctx context.Context, key string) (string, error) {
+	key = currentOptionKey(key)
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	switch {
-	case key == OptionIngestParts:
-		return db.Database.GetOption(ctx, chargewireIngestParts)
-	case key == OptionResumeTimeout:
-		return db.Database.GetOption(ctx, chargewireResumeTimeout)
 	case isHardchargerOption(key):
 		return db.cfg.get(key)
 	case key == adbc.OptionKeyURI && db.uri != "":
@@ -210,7 +203,7 @@ func (db *database) Open(ctx context.Context) (adbc.ConnectionWithContext, error
 	attached := db.attaching()
 	cnxn := &connection{Connection: inner.(driverbase.Connection), setup: setup, attached: attached}
 	if !setup.applied.Load() && attached {
-		// A session the connection attached to (adbc.chargewire.session.id): the
+		// A session the connection attached to (chargewire.session.id): the
 		// driver didn't create it, so its hook didn't run. It gets the
 		// database's tags and settings now, as before; it is never replaced.
 		// A connection to a stopped server has no session yet (it opens at
@@ -318,14 +311,12 @@ type connection struct {
 	// setup is what every session of the connection gets (sessionSetup).
 	setup *sessionSetup
 	// attached: the session is one the connection attached to
-	// (adbc.chargewire.session.id), which the new-session hook never sets up.
+	// (chargewire.session.id), which the new-session hook never sets up.
 	attached bool
 }
 
 func (c *connection) SetOption(ctx context.Context, key, value string) error {
-	if key == OptionIngestParts {
-		key = chargewireIngestParts
-	}
+	key = currentOptionKey(key)
 	name, global, err := connectionSetting(key)
 	if err != nil {
 		return err
@@ -356,9 +347,7 @@ func (c *connection) SetOption(ctx context.Context, key, value string) error {
 }
 
 func (c *connection) GetOption(ctx context.Context, key string) (string, error) {
-	if key == OptionIngestParts {
-		key = chargewireIngestParts
-	}
+	key = currentOptionKey(key)
 	name, _, err := connectionSetting(key)
 	if err != nil {
 		return "", err

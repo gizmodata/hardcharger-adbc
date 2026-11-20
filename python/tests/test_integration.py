@@ -562,9 +562,9 @@ def test_a_transaction_moves_to_another_process(hc_server):
             uri=hc_server.uri, access_token=token, session_id=session_id
         ) as attached:
             assert attached.session_id == session_id
-            assert attached.adbc_connection.get_option(
-                key="adbc.chargewire.session.transaction"
-            ) == ("open")
+            assert attached.adbc_connection.get_option(key="hardcharger.session.transaction") == (
+                "open"
+            )
             assert _count(conn=attached, sql="SELECT count(*) FROM handoff") == 1
             with attached.cursor() as cur:
                 cur.execute(operation="COMMIT")
@@ -613,7 +613,7 @@ def test_close_session_on_release(hc_server):
     # A created session ends when its connection closes...
     with hardcharger.connect(uri=hc_server.uri, **credentials) as conn:
         created = conn.session_id
-        assert conn.adbc_connection.get_option(key="adbc.chargewire.session.close_on_release") == (
+        assert conn.adbc_connection.get_option(key="hardcharger.session.close_on_release") == (
             "true"
         )
     error = _attach_error(server=hc_server, session_id=created, **credentials)
@@ -624,12 +624,12 @@ def test_close_session_on_release(hc_server):
     for _ in range(2):
         with hardcharger.connect(uri=hc_server.uri, session_id=kept, **credentials) as attached:
             assert attached.adbc_connection.get_option(
-                key="adbc.chargewire.session.close_on_release"
+                key="hardcharger.session.close_on_release"
             ) == ("false")
             assert attached.session_id == kept
     # ... until a connection that may end it closes.
     with hardcharger.connect(uri=hc_server.uri, session_id=kept, **credentials) as attached:
-        attached.adbc_connection.set_options(**{"adbc.chargewire.session.close_on_release": "true"})
+        attached.adbc_connection.set_options(**{"hardcharger.session.close_on_release": "true"})
     error = _attach_error(server=hc_server, session_id=kept, **credentials)
     assert chargewire_code(error=error) == "session_not_found"
 
@@ -682,7 +682,7 @@ def test_the_access_token_is_readable_and_works(lifetime_server):
         )
         left = expires_at - datetime.datetime.now(tz=datetime.timezone.utc)
         assert datetime.timedelta(seconds=590) < left <= datetime.timedelta(seconds=601), left
-        text = conn.adbc_connection.get_option(key="adbc.chargewire.auth.access_token_expires_at")
+        text = conn.adbc_connection.get_option(key="hardcharger.auth.access_token_expires_at")
         # "Z" as "+00:00": Python 3.10's fromisoformat doesn't read the "Z".
         assert text.endswith("Z")
         assert datetime.datetime.fromisoformat(text[:-1] + "+00:00") == expires_at
@@ -1039,7 +1039,7 @@ def test_settings_and_tags_survive_a_replaced_session(hc_server):
             cur.execute(operation="SELECT 41 + 1")
             assert cur.fetchone()[0] == 42
         assert conn.session_id != old
-        replacements = conn.adbc_connection.get_option(key="adbc.chargewire.session.replacements")
+        replacements = conn.adbc_connection.get_option(key="hardcharger.session.replacements")
         assert replacements == "1"
         assert conn.get_setting(name="query_timeout") == "12"
         assert conn.get_setting(name="idle_in_transaction_session_timeout") == "30"
@@ -1359,7 +1359,7 @@ def test_manifest_loads_the_driver_by_name_with_a_hardcharger_uri(hc_server, tmp
             "uri": f"hardcharger://127.0.0.1:{hc_server.port}?tls=false",
             "username": USERNAME,
             "password": hc_server.password,
-            "adbc.hardcharger.query_tag": '{"via": "manifest"}',
+            "hardcharger.session.query_tag": '{"via": "manifest"}',
         },
         autocommit=True,
     ) as conn:
@@ -1367,7 +1367,7 @@ def test_manifest_loads_the_driver_by_name_with_a_hardcharger_uri(hc_server, tmp
             cur.execute("SELECT HARDCHARGER_USER()")
             assert cur.fetchone() == (USERNAME,)
         assert conn.adbc_get_info()["driver_name"] == "ADBC Hardcharger Driver - Go"
-        assert conn.adbc_connection.get_option(key="adbc.hardcharger.query_tag") == (
+        assert conn.adbc_connection.get_option(key="hardcharger.session.query_tag") == (
             '{"via": "manifest"}'
         )
 
@@ -1478,7 +1478,7 @@ def test_one_result_partition_when_asked(hc_server):
         uri=hc_server.uri,
         username=USERNAME,
         password=hc_server.password,
-        db_kwargs={"adbc.chargewire.statement.result_partitions": "1"},
+        db_kwargs={"hardcharger.query.result_partitions": "1"},
     ) as conn:
         with conn.cursor() as cur:
             partitions, _ = cur.adbc_execute_partitions(operation=LARGE_RESULT)
@@ -1550,17 +1550,17 @@ def test_an_ingest_goes_in_parts_by_default(proxied):
 
 def test_one_ingest_part_when_asked_by_hardcharger_name(proxied):
     connect, ingest_requests = proxied
-    with connect(db_kwargs={"adbc.hardcharger.ingest.parts": "1"}) as conn:
+    with connect(db_kwargs={"hardcharger.ingest.parts": "1"}) as conn:
         ingest_16_batches(conn=conn, table="py_one_part")
     assert ingest_requests() == (1, 0, 0)
 
 
 def test_ingest_parts_by_chargewire_name_and_on_a_connection(proxied):
     connect, ingest_requests = proxied
-    with connect(db_kwargs={"adbc.chargewire.ingest.parts": "2"}) as conn:
+    with connect(db_kwargs={"chargewire.ingest.parts": "2"}) as conn:
         ingest_16_batches(conn=conn, table="py_two_parts")
     assert ingest_requests() == (0, 1, 2)
     with connect() as conn:
-        conn.adbc_connection.set_options(**{"adbc.hardcharger.ingest.parts": "3"})
+        conn.adbc_connection.set_options(**{"hardcharger.ingest.parts": "3"})
         ingest_16_batches(conn=conn, table="py_three_parts")
     assert ingest_requests() == (0, 2, 5)

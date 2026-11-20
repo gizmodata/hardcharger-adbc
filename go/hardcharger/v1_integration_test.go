@@ -16,7 +16,7 @@ import (
 	"github.com/apache/arrow-adbc/go/adbc"
 )
 
-const optionSessionTransaction = "adbc.chargewire.session.transaction"
+const optionSessionTransaction = "chargewire.session.transaction"
 
 func execUpdate(t *testing.T, cnxn adbc.ConnectionWithContext, sql string) {
 	t.Helper()
@@ -68,7 +68,7 @@ func TestIntegrationSessionTransactionIsTheServers(t *testing.T) {
 func TestIntegrationNoClientCertificateIsCertificateRequired(t *testing.T) {
 	ca := newCertificateAuthority(t)
 	server := startServer(t, ca.mtlsServerArgs()...)
-	_, _, err := open(t, server, map[string]string{"adbc.chargewire.tls.root_certs": ca.caPEM})
+	_, _, err := open(t, server, map[string]string{"chargewire.tls.root_certs": ca.caPEM})
 	wantStatus(t, err, adbc.StatusUnauthenticated, "certificate")
 	if code := chargewireCode(err); code != "certificate_required" {
 		t.Fatalf("chargewire.code %q: %v", code, err)
@@ -93,7 +93,7 @@ func tryUpdate(t *testing.T, cnxn adbc.ConnectionWithContext, sql string) error 
 
 // A session Hardcharger ends for idling in a transaction
 // (hardcharger.idle_in_transaction_session_timeout, set for the session
-// through adbc.hardcharger.setting.*) is replaced: the statement that finds it
+// through hardcharger.setting.*) is replaced: the statement that finds it
 // ended fails with session_ended (idle_in_transaction) instead of running
 // again in autocommit after the transaction was rolled back, and the
 // connection works afterwards (chargewire-adbc 2.1.0; with 2.0.0 every later

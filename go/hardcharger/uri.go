@@ -3,7 +3,6 @@
 package hardcharger
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/apache/arrow-adbc/go/adbc"
+	"github.com/gizmodata/chargewire-adbc/go/v2/chargewire"
 )
 
 const (
@@ -53,12 +53,9 @@ func ToChargewireURI(raw string) (string, error) {
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		// url.Error repeats the URI, password included: report only the cause.
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
-			err = urlErr.Err
-		}
-		return "", invalidArgument("invalid uri: %v", err)
+		// url.Error repeats the URI, and its cause the bad escape, either of
+		// which may be part of a password: describe the problem only.
+		return "", invalidArgument("invalid uri: %s", chargewire.URIParseProblem(err))
 	}
 	scheme := strings.ToLower(u.Scheme)
 	switch {
