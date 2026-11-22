@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Built on chargewire-adbc 2.5.2** (was 2.5.0). Its 2.5.1 and 2.5.2 changed only its Python package
+  (`connect(read_only=True)` and its PyPI page); the Go driver this library links is unchanged.
+
 ## [2.7.2] - 2026-11-20
 
 ### Changed
