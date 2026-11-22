@@ -615,7 +615,7 @@ packaging/           the driver manifest template
 ## 🛠️ Building and testing
 
 Go 1.27 with cgo (and, on Linux, `zig` for the glibc 2.17 build), Python 3.10+. The Chargewire
-driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.5.0
+driver is the Go module `github.com/gizmodata/chargewire-adbc/go/v2`, pinned to its released v2.5.2
 in `go/go.mod`.
 
 ```bash
